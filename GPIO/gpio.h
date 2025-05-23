@@ -2,7 +2,7 @@
  * gpio.h
  *
  *  Created on: May 23, 2025
- *      Author: ACER
+ *      Author: Ech Xanh UET
  */
 
 #ifndef GPIO_H_
