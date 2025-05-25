@@ -14,6 +14,7 @@ Chú ý: Để tạo ngắt cần enable interrupt ở cả ARM cortex (NVIC tab
   
 # Tài liệu tham khảo
 RM0008 Reference manual
+
 Cortex-M3 Reference manual
 
 
