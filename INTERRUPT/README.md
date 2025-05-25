@@ -1,9 +1,16 @@
-# Project Title
-Đây là một source code interrupt cho stm32f103c8t6
+# STM32F103C8T6 - Interrupt Source Code
+Đây là một source code để cấu hình và xử lý ngắt
+
 # Mô tả
-Source code này hỗ trợ tạo ngắt ở các line 1,2,3,4, line 5_9 và line 10_15.
-Tuy nhiên, chưa xử lý được vấn đề về priority, hiện tại đang xử lý ngắt đơn lẻ. Priority sẽ được đề cập ở các project sau.
-Chú ý: Để tạo ngắt cần enable interrupt ở cả ARM cortex (NVIC table) và ở Peripheral.
+Thư viện này hỗ trợ xử lý ngắt trên các line sau của EXTI:
+- Line 1, 2, 3, 4
+- Line 5 đến 9 (EXTI9_5)
+- Line 10 đến 15 (EXTI15_10)
+Lưu ý:
+- Hiện tại mới xử lý ngắt đơn lẻ, chưa xử lý priority (độ ưu tiên).
+- Việc thiết lập priority sẽ được bổ sung trong các project tiếp theo.
+**Chú ý**: Để tạo ngắt cần enable interrupt ở cả ARM cortex (NVIC table) và ở Peripheral.
+  
 # Tài liệu tham khảo
 RM0008 Reference manual
 Cortex-M3 Reference manual
