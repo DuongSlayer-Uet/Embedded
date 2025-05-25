@@ -86,7 +86,19 @@ void EXTI0_IRQHandler(void)
 		// Clear interrupt flag
 		EXTI->PR |= (1 << 0);
 		// Do something
-		GPIO_toggle_pin(GPIOC, 13);
+		//GPIO_toggle_pin(GPIOC, 13);
+
+	}
+}
+
+void EXTI1_IRQHandler(void)
+{
+	if(EXTI->PR & (1 << 1))
+	{
+		// Clear interrupt flag
+		EXTI->PR |= (1 << 1);
+		// Do something
+		//GPIO_toggle_pin(GPIOC, 13);
 
 	}
 }
@@ -97,7 +109,18 @@ void EXTI2_IRQHandler(void)
 	{
 		// Clear interrupt flag
 		EXTI->PR |= (1 << 2);
-		GPIO_toggle_pin(GPIOC, 13);
+		//GPIO_toggle_pin(GPIOC, 13);
+
+	}
+}
+
+void EXTI3_IRQHandler(void)
+{
+	if(EXTI->PR & (1 << 3))
+	{
+		// Clear interrupt flag
+		EXTI->PR |= (1 << 3);
+		//GPIO_toggle_pin(GPIOC, 13);
 
 	}
 }
@@ -108,7 +131,7 @@ void EXTI4_IRQHandler(void)
 	{
 		// Clear interrupt flag
 		EXTI->PR |= (1 << 4);
-		GPIO_toggle_pin(GPIOC, 13);
+		//GPIO_toggle_pin(GPIOC, 13);
 
 	}
 }
@@ -121,7 +144,7 @@ void EXTI9_5_IRQHandler(void)
 		{
 			// CLEAR FLAG
 			EXTI->PR |= (1 << i);
-			GPIO_toggle_pin(GPIOC, 13);
+			//GPIO_toggle_pin(GPIOC, 13);
 		}
 	}
 }
@@ -134,7 +157,7 @@ void EXTI15_10_IRQHandler(void)
 		{
 			// CLEAR FLAG
 			EXTI->PR |= (1 << i);
-			GPIO_toggle_pin(GPIOC, 13);
+			//GPIO_toggle_pin(GPIOC, 13);
 		}
 	}
 }
