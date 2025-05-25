@@ -9,7 +9,8 @@ Thư viện này hỗ trợ xử lý ngắt trên các line sau của EXTI:
 Lưu ý:
 - Hiện tại mới xử lý ngắt đơn lẻ, chưa xử lý priority (độ ưu tiên).
 - Việc thiết lập priority sẽ được bổ sung trong các project tiếp theo.
-**Chú ý**: Để tạo ngắt cần enable interrupt ở cả ARM cortex (NVIC table) và ở Peripheral.
+
+Chú ý: Để tạo ngắt cần enable interrupt ở cả ARM cortex (NVIC table) và ở Peripheral.
   
 # Tài liệu tham khảo
 RM0008 Reference manual
