@@ -35,8 +35,23 @@ typedef struct
 // SR Register bit
 #define TXE		(1 << 7)
 
+/*
+ * @brief Cấp clock cho gpioA, uart1 và config input ouput cho RXTX
+ * @param void
+ * @retval none
+ */
 void UART1_gpio_init(void);
+/*
+ * @brief Set baud 9k6 và Enable RXTX,UART
+ * @param void
+ * @retval none
+ */
 void UART1_baud_init(void);
+/*
+ * @brief Gửi dữ liệu
+ * @param ký tự kiểu char
+ * @retval none
+ */
 void UART1_send_data(char data);
 
 #endif /* UART_H_ */
