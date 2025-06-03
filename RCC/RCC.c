@@ -98,9 +98,9 @@ void RCC_Config_HSI_8MHz(void)
 	// APB2 = AHB = 8
 	RCC->CFGR &= ~(0xF << 11);
 
-	// Source clock as HSE
+	// Source clock as HSI
 	RCC->CFGR &= ~(0b11 << 0);
-	RCC->CFGR |= SW_HSE;
+	RCC->CFGR |= SW_HSI;
 }
 
 void RCC_Config_HSI_PLL_64MHz(void)
