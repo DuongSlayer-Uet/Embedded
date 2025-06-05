@@ -23,10 +23,10 @@ typedef struct
 } GPIO_Typedef;
 
 // GPIO Address
-#define GPIOA (GPIO_Typedef*)0x40010800
-#define GPIOB (GPIO_Typedef*)0x40010C00
-#define GPIOC (GPIO_Typedef*)0x40011000
-#define GPIOD (GPIO_Typedef*)0x40011400
+#define GPIOA ((GPIO_Typedef*)0x40010800)
+#define GPIOB ((GPIO_Typedef*)0x40010C00)
+#define GPIOC ((GPIO_Typedef*)0x40011000)
+#define GPIOD ((GPIO_Typedef*)0x40011400)
 
 #define RCC_APB2ENR (volatile uint32_t*)0x40021018		// RCC APB2 Enable register
 
