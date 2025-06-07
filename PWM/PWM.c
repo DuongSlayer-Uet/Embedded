@@ -20,7 +20,7 @@ void Clock_Enable_PWM1()
 
 void GPIOA_Alternative_PushPull()
 {
-	// PA0, alternative func, Output, max 10mhz, push pull
+	// PA0, alternative func, Output, max 50mhz, push pull
 	GPIOA->CRL &= ~(0xF << 0);
 	GPIOA->CRL |= (0b1011 << 0);
 }
