@@ -39,3 +39,8 @@ void UART1_send_data(char data)
 	while(((UART1->SR) & (1 << 6)) == 0x00);
 }
 
+uint8_t UART1_reveive_data(void)
+{
+	while(((UART1->SR) & RXNE) == 0x00);
+	return (uint8_t)(UART1->DR);
+}

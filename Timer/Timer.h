@@ -24,14 +24,11 @@ typedef struct
 	volatile uint32_t CNT;
 	volatile uint32_t PSC;		// PRESCALER REG
 	volatile uint32_t ARR;		// AUTO RE-LOAD REGISTER
-	volatile uint32_t reserved1;// Giữ nguyên
-	volatile uint32_t CCR1;		// Dutycycle Reg
 }TIMX_TypeDef;
 
 #define RCC_BASE_ADDRESS 0x40021000U
 
 #define TIM1 				((TIMX_TypeDef*)0x40012C00U)
-#define TIM2				((TIMX_TypeDef*)0x40000000U)
 
 
 void enable_clock_for_timer1(void);

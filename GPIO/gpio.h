@@ -2,7 +2,7 @@
  * gpio.h
  *
  *  Created on: May 23, 2025
- *      Author: Ech Xanh UET
+ *      Author: ACER
  */
 
 #ifndef GPIO_H_
@@ -28,7 +28,7 @@ typedef struct
 #define GPIOC ((GPIO_Typedef*)0x40011000)
 #define GPIOD ((GPIO_Typedef*)0x40011400)
 
-#define RCC_APB2ENR (volatile uint32_t*)0x40021018		// RCC APB2 Enable register
+
 
 /*
  * @brief Khởi tạo GPIO (Clock for GPIO)

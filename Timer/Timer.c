@@ -6,6 +6,7 @@
  */
 
 #include "Timer.h"
+#include "RCC.h"
 
 void enable_clock_for_timer1(void)
 {

@@ -9,12 +9,7 @@
 #define UART_H_
 
 #include <stdint.h>
-
-typedef struct
-{
-	volatile uint32_t CRL;
-	volatile uint32_t CRH;
-}GPIO_Typedef;
+#include "gpio.h"
 
 typedef struct
 {
@@ -24,7 +19,7 @@ typedef struct
 	volatile uint32_t CR1;
 }UART_Typedef;
 
-#define GPIOA		((GPIO_Typedef*)0x40010800)
+//#define GPIOA		((GPIO_Typedef*)0x40010800)
 
 
 #define UART1		((UART_Typedef*)0x40013800)
@@ -34,7 +29,7 @@ typedef struct
 #define RE 		(1 << 2)
 // SR Register bit
 #define TXE		(1 << 7)
-
+#define RXNE	(1 << 5)
 /*
  * @brief Cấp clock cho gpioA, uart1 và config input ouput cho RXTX
  * @param void
@@ -53,5 +48,11 @@ void UART1_baud_init(void);
  * @retval none
  */
 void UART1_send_data(char data);
+/*
+ * @brief Nhận dữ liệu
+ * @param none
+ * @retval data
+ */
+uint8_t UART1_reveive_data(void);
 
 #endif /* UART_H_ */
