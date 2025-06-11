@@ -1,0 +1,5 @@
+../Src/RCC.c:9:6:RCC_Config_HSE_PLL_48MHz	4	static
+../Src/RCC.c:42:6:RCC_Config_HSE_PLL_72MHz	4	static
+../Src/RCC.c:80:6:RCC_Config_HSI_8MHz	4	static
+../Src/RCC.c:106:6:RCC_Config_HSI_PLL_64MHz	4	static
+../Src/RCC.c:144:6:RCC_Config	16	static

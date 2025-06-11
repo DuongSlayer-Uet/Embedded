@@ -1,0 +1,2 @@
+../Src/Flash.c:10:6:Flash_WriteHalfWord	4
+../Src/Flash.c:37:6:Flash_EraseOnePage	4

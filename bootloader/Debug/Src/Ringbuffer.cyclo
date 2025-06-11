@@ -1,0 +1,3 @@
+../Src/Ringbuffer.c:10:6:Ringbuffer_put	2
+../Src/Ringbuffer.c:20:5:Ringbuffer_get	2
+../Src/Ringbuffer.c:28:6:Ringbuffer_init	1

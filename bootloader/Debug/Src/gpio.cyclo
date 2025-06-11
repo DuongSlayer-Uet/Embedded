@@ -1,0 +1,4 @@
+../Src/gpio.c:11:6:GPIO_init_output	7
+../Src/gpio.c:46:6:GPIO_set	1
+../Src/gpio.c:51:6:GPIO_reset	1
+../Src/gpio.c:56:6:GPIO_toggle_pin	2
