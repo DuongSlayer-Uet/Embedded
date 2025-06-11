@@ -6,8 +6,15 @@
  */
 
 #include "Interrupt.h"
-//#include "gpio.h"
+#include "UART.h"
+#include "gpio.h"
+#include "flash.h"
+#include "Ringbuffer.h"
 #include <stdint.h>
+
+// Biến toàn cục để theo dõi địa chỉ Flash hiện tại
+
+RingBuffer_Typedef ringbuffer;
 
 void NVIC_Enable_IRQ(uint8_t EXTI_IRQ_NUM)
 {
@@ -20,6 +27,7 @@ void NVIC_Enable_IRQ(uint8_t EXTI_IRQ_NUM)
 		NVIC_ISER1 |= (1 << (EXTI_IRQ_NUM - 32));
 	}
 }
+
 
 void EXTI_Init(GPIO_Typedef* gpio, uint8_t pin, uint8_t edge_type)
 {
@@ -79,6 +87,24 @@ void EXTI_Init(GPIO_Typedef* gpio, uint8_t pin, uint8_t edge_type)
 	}
 }
 
+void USART1_RX_Int_init(void)
+{
+	UART1_RX_Int_setup();
+	NVIC_Enable_IRQ(USART1);
+}
+
+void USART1_IRQHandler(void)
+{
+	if(UART1->SR & RXNE)
+	{
+		if((UART1->SR & (UART_ORE | UART_PE | UART_FE)) == 0)
+		{
+			char data = (char)(UART1->DR);
+			Ringbuffer_put(&ringbuffer, (uint8_t)data);
+		}
+	}
+}
+
 void EXTI0_IRQHandler(void)
 {
 	if(EXTI->PR & (1 << 0))
@@ -109,6 +135,8 @@ void EXTI2_IRQHandler(void)
 	{
 		// Clear interrupt flag
 		EXTI->PR |= (1 << 2);
+
+		// Do something
 		//GPIO_toggle_pin(GPIOC, 13);
 
 	}
@@ -120,6 +148,7 @@ void EXTI3_IRQHandler(void)
 	{
 		// Clear interrupt flag
 		EXTI->PR |= (1 << 3);
+		// Do something
 		//GPIO_toggle_pin(GPIOC, 13);
 
 	}
