@@ -5,8 +5,9 @@
  *      Author: EEch xanh UET
  */
 #include "UART.h"
-#include "RCC.h"
 #include "gpio.h"
+#include "RCC.h"
+
 
 void UART1_gpio_init(void)
 {
@@ -54,4 +55,14 @@ char UART1_reveive_data(void)
 {
 	while(((UART1->SR) & RXNE) == 0x00);
 	return (char)(UART1->DR);
+}
+
+void UART1_DMA_Setup(void)
+{
+	// Baud 9600
+	UART1->BRR = (52 << 4) | 1;
+	// Enable UART, RX
+	UART1->CR1 |= UE | RE;
+	// Enable DMA-RX
+	UART1->CR3 |= UART_CR3_DMAR;
 }

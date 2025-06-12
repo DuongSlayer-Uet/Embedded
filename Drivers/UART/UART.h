@@ -18,6 +18,8 @@ typedef struct
 	volatile uint32_t DR;
 	volatile uint32_t BRR;
 	volatile uint32_t CR1;
+	volatile uint32_t CR2;
+	volatile uint32_t CR3;
 }UART_Typedef;
 
 
@@ -33,6 +35,8 @@ typedef struct
 #define UART_ORE		(1 << 3)
 #define	UART_FE		(1 << 1)
 #define UART_PE		(1 << 0)
+// CR3 Register bit
+#define UART_CR3_DMAR	(1 << 6)
 /*
  * @brief Cấp clock cho gpioA, uart1 và config input ouput cho RXTX
  * @param void
@@ -47,16 +51,23 @@ void UART1_gpio_init(void);
 void UART1_baud_init(void);
 /*
  * @brief Gửi dữ liệu
- * @param ký tự kiểu char
+ * @param
  * @retval none
  */
 void UART1_send_data(char data);
 /*
  * @brief Nhận dữ liệu
- * @param ký tự kiểu char
+ * @param
  * @retval none
  */
 char UART1_reveive_data(void);
+/*
+ * @brief Set baud 9600, setup rx interrupt
+ * @param ký tự kiểu char
+ * @retval none
+ */
 void UART1_RX_Int_setup(void);
+
+void UART1_DMA_Setup(void);
 
 #endif /* UART_H_ */
