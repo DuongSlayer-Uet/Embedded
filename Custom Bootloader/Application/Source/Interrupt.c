@@ -42,6 +42,7 @@ void EXTI_Init(GPIO_Typedef* gpio, uint8_t pin, uint8_t edge_type)
 		gpio->CRH |= (0b1000 << ((pin - 8)*4));
 	}
 	// Pull up
+	gpio->ODR &= ~(1 << pin);
 	gpio->ODR |= (1 << pin);
 	// Enable Interrupt linee
 	uint8_t port_code = 0;
@@ -68,17 +69,19 @@ void EXTI_Init(GPIO_Typedef* gpio, uint8_t pin, uint8_t edge_type)
 	else if(pin < 16)
 	{
 		AFIO->EXTICR4 &= ~(0xF << (pin - 12)*4);
-		AFIO->EXTICR1 |= (port_code << (pin - 12)*4);
+		AFIO->EXTICR4 |= (port_code << (pin - 12)*4);
 	}
 	// Unable mask at line 0
 	EXTI->IMR |= (1 << pin);
 	// Enable Falling Edge Detection
 	if(edge_type == 0)
 	{
+		EXTI->RTSR &= ~(1 << pin);
 		EXTI->FTSR |= (1 << pin);
 	}
 	else if(edge_type == 1)
 	{
+		EXTI->FTSR &= ~(1 << pin);
 		EXTI->RTSR |= (1 << pin);
 	}
 }
@@ -156,8 +159,14 @@ void EXTI4_IRQHandler(void)
 	{
 		// Clear interrupt flag
 		EXTI->PR |= (1 << 4);
-		//GPIO_toggle_pin(GPIOC, 13);
-
+		// Clear flag ở page 50
+		Flash_EraseOnePage(0x0800C800);
+		// Flag = 0x0ABC
+		Flash_WriteHalfWord(0x0800C800, 0x0ABC);
+		// Toggle báo hiệu
+		GPIO_toggle_pin(GPIOC, 13);
+		// Soft reset, 0x05FA là key, bit 2 là bit reset
+		RESET_AIRCR = (0x05FA << 16) | (1 << 2);
 	}
 }
 
@@ -169,7 +178,6 @@ void EXTI9_5_IRQHandler(void)
 		{
 			// CLEAR FLAG
 			EXTI->PR |= (1 << i);
-			//GPIO_toggle_pin(GPIOC, 13);
 		}
 	}
 }
@@ -182,7 +190,7 @@ void EXTI15_10_IRQHandler(void)
 		{
 			// CLEAR FLAG
 			EXTI->PR |= (1 << i);
-			//GPIO_toggle_pin(GPIOC, 13);
+			GPIO_toggle_pin(GPIOC, 13);
 		}
 	}
 }

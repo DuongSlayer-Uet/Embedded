@@ -6,12 +6,7 @@
  ******************************************************************************
  * @attention
  *
- * Copyright (c) 2025 STMicroelectronics.
- * All rights reserved.
- *
- * This software is licensed under terms that can be found in the LICENSE file
- * in the root directory of this software component.
- * If no LICENSE file comes with this software, it is provided AS-IS.
+ * Đây là hàm main của custom mini bootloader
  *
  ******************************************************************************
  */
@@ -30,7 +25,6 @@
   #warning "FPU is not initialized, but the project is compiling for an FPU. Please initialize the FPU before use."
 #endif
 
-//extern RingBuffer_Typedef ringbuffer;
 static uint8_t is_first_write = 1; // Cờ để kiểm tra lần ghi đầu tiên
 static uint32_t current_flash_address = 0x08002000;
 // Địa chỉ bắt đầu của application
@@ -39,8 +33,6 @@ static uint32_t current_flash_address = 0x08002000;
 typedef void (*appfuncpointer)(void);
 
 void goto_app();
-
-void setup_boot_pin(void);
 
 int main(void)
 {
@@ -57,14 +49,27 @@ int main(void)
 
 	DMA1_Channel5_UART1_RX_setup();
 
-	setup_boot_pin();
+	// SETUP NGẮT BOOTPIN
+	// Enable clock for INT pin
+	RCC_APB2ENR |= (1 << 2) | (1 << 0);
+	// Enable INT5_9 from NVIC
+	NVIC_Enable_IRQ(EXTI5_9_IRQ_NUM);
+	// Enable Int5 from peripheral, rising edge
+	EXTI_Init(GPIOA, 5, 1);
+
+	// Check xem có chương trình chưa
+	if(Flash_ReadHalfWord(0x08002400) == 0xFFFF)
+	{
+		Flash_EraseOnePage(0x0800C800);
+		Flash_WriteHalfWord(0x0800C800, 0x0ABC);
+	}
 
 	uint8_t data;
 	uint8_t tmp_data;
 	uint8_t has_tmp_data = 0;
 	while(1)
 	{
-		if((GPIOA->IDR & (1 << 5)) == 0)	// Check bootpin (PA5), == 0 thì vào chế độ nạp firmware
+		if(Flash_ReadHalfWord(0x0800C800) == 0x0ABC)	// Check cờ boot mode
 		{
 			// Update ringbuffer từ DMA
 			DMA1_Channel5_update_ringbuffer();
@@ -78,7 +83,7 @@ int main(void)
 					Flash_EraseOnePage(0x08002800);
 					is_first_write = 0;
 				}
-				if(!has_tmp_data)	// biến hastmpdata để hỗ trợ việc ghép 2 data và tmp_data
+				if(!has_tmp_data)	// biến has tmp data để hỗ trợ việc ghép 2 data và tmp_data
 				{
 					tmp_data = data;
 					has_tmp_data = 1;
@@ -94,14 +99,19 @@ int main(void)
 				}
 			}
 		}
-		else	// bootpin == 1 -> goto application
+		else	// Check cờ boot mode
 		{
 			goto_app();
 		}
 	}
 }
 
-
+/*
+ * @brief Hàm này dùng để set msp, set lại offset vectortable, nhảy đến rshandler của app
+ * 		  Thông tin về các địa chỉ thanh ghi này có đề cập trong tài liệu arm cortex M3
+ * @param void
+ * @retval none
+ */
 void goto_app()
 {
 	// Lấy địa chỉ msp của app
@@ -116,15 +126,4 @@ void goto_app()
 	appfuncpointer app_pointer = (appfuncpointer)app_rshandler;
 	app_pointer();
 	while(1);
-}
-
-void setup_boot_pin(void)
-{
-	// Port A RCC enable
-	RCC_APB2ENR |= (1 << 2);
-	// Set input
-	GPIOA->CRL &= ~(0xF << 20);
-	GPIOA->CRL |= (0b1000 << 20);
-	// Set pullup
-	GPIOA->ODR |= (1 << 5);
 }

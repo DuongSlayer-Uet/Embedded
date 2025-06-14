@@ -51,7 +51,7 @@ void Flash_EraseOnePage(uint32_t address)
 	FLASH->CR |= CR_PER;
 
 	// Page Address
-	FLASH->AR = address;
+	FLASH->AR |= address;
 
 	// Start erase
 	FLASH->CR |= CR_STRT;
