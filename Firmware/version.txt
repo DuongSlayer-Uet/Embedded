@@ -1,3 +1,2 @@
 blinkled.bin
-version: 16.0
-hehehe
+version: 18.0
