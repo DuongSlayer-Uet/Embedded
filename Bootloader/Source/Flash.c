@@ -51,7 +51,7 @@ void Flash_EraseOnePage(uint32_t address)
 	FLASH->CR |= CR_PER;
 
 	// Page Address
-	FLASH->AR |= address;
+	FLASH->AR = address;
 
 	// Start erase
 	FLASH->CR |= CR_STRT;
@@ -64,4 +64,14 @@ void Flash_EraseOnePage(uint32_t address)
 
 	// LOCK
 	FLASH->CR |= CR_LOCK;
+}
+
+uint16_t Flash_ReadHalfWord(uint32_t address)
+{
+	return (*(volatile uint16_t*)address);
+}
+
+uint32_t Flash_ReadWord(uint32_t address)
+{
+	return (*(volatile uint32_t*)address);
 }

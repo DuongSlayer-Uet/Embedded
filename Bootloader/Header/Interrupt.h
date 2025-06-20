@@ -48,12 +48,12 @@ typedef struct
 #define NVIC_ISER0 				(*(volatile uint32_t*)(NVIC_ISER_BASEADRESS + 0X00))		// For EXTI0->9
 #define NVIC_ISER1 				(*(volatile uint32_t*)(NVIC_ISER_BASEADRESS + 0X04))		// For EXTI10->15
 
-// System register control (Dùng để reset)
-#define RESET_AIRCR				(*(volatile uint32_t*)0xE000ED0C)
-
 // peripherals_level
 #define EXTI ((EXTI_TypeDef*)0x40010400U)
 #define AFIO ((AFIO_TypeDef*)0x40010000U)
+
+// System register control (Dùng để reset)
+#define RESET_AIRCR				(*(volatile uint32_t*)0xE000ED0C)
 
 /*
  * @brief Enable ngắt ở trong core arm, cho phép ngắt ở NVIC
