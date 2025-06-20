@@ -1,3 +1,0 @@
-../Src/main.c:44:5:main	16	static
-../Src/main.c:99:6:goto_app	24	static,ignoring_inline_asm
-../Src/main.c:114:6:setup_boot_pin	4	static

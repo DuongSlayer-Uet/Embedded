@@ -1,3 +1,0 @@
-../Src/Timer.c:11:6:enable_clock_for_timer1	4	static
-../Src/Timer.c:16:6:setup_timer1	4	static
-../Src/Timer.c:26:6:delay_1s	16	static

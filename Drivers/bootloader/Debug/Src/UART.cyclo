@@ -1,5 +1,0 @@
-../Src/UART.c:11:6:UART1_gpio_init	1
-../Src/UART.c:28:6:UART1_baud_init	1
-../Src/UART.c:37:6:UART1_RX_Int_setup	1
-../Src/UART.c:46:6:UART1_send_data	3
-../Src/UART.c:53:6:UART1_reveive_data	2
