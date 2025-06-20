@@ -37,5 +37,8 @@ void Flash_WriteHalfWord(uint32_t address, uint16_t data);
 
 void Flash_EraseOnePage(uint32_t address);
 
+uint16_t Flash_ReadHalfWord(uint32_t address);
+
+uint32_t Flash_ReadWord(uint32_t address);
 
 #endif /* FLASH_H_ */
