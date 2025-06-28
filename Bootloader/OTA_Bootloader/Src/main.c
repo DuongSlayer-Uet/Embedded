@@ -1,19 +1,9 @@
 /**
- ******************************************************************************
- * @file           : main.c
- * @author         : Ech xanh uet
- * @brief          : Main program body
- ******************************************************************************
- * @attention
- *
- * Copyright (c) 2025 STMicroelectronics.
- * All rights reserved.
- *
- * This software is licensed under terms that can be found in the LICENSE file
- * in the root directory of this software component.
- * If no LICENSE file comes with this software, it is provided AS-IS.
- *
- ******************************************************************************
+Author: Ech Xanh UET
+Description: Đây là main program của bootloader, chương trình này
+có nhiệm vụ check khởi tạo cờ lần đầu tiên, check các cờ khi chip thực hiện reset.
+Ngoài ra, sau mỗi lần nạp, chương trình sẽ nhảy đến vị trí tương ứng (app hoặc factory firmware)
+
  */
 
 #include <stdint.h>
@@ -148,7 +138,7 @@ void JumpToAppFirmware(void)
 	// Set lại offset vector table của app
 	*(uint32_t*)0xE000ED08 = ADDR_APP_START;
 	// Trỏ đến rshander của app
-	appFuncPointer app_pointer = (factoryFuncPointer)app_rshandler;
+	appFuncPointer app_pointer = (appFuncPointer)app_rshandler;
 	app_pointer();
 	while(1);
 }
