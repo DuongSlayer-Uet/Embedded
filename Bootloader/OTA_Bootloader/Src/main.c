@@ -16,6 +16,7 @@ Ngoài ra, sau mỗi lần nạp, chương trình sẽ nhảy đến vị trí t
 #include "gpio.h"
 #include "Interrupt.h"
 #include "Bootflags.h"
+#include "IWDG.h"
 
 
 // Flag
@@ -48,6 +49,7 @@ char cmd_window[CMD_WINDOW_SIZE] = {0};  // Buffer để kiếm tra "STOPP"
 
 int main(void)
 {
+	IWDG_setup();
 	// Magic flag giúp báo hiệu đã có flags ở đây
 	if(Flash_ReadWord((uint32_t)(&(flags->magic))) != 0xBEFFDEAD)
 	{
@@ -222,6 +224,8 @@ void UpdateFirmware(uint32_t address, uint16_t next_action_flag)
 				}
 				break;
 			case RECEIVING:
+				// Refresh Watchdog
+				IWDG_refresh();
 				// Sử dụng kỹ thuật left pushing technique
 				push_char_to_window(data);
 				if (strncmp(cmd_window, "STOPP", CMD_WINDOW_SIZE) == 0)

@@ -159,3 +159,9 @@ void RCC_Config(ClockConfig_t clock)
 			break;
 	}
 }
+
+void RCC_Config_LSI_40K(void)
+{
+	RCC->CSR |= (1 << 0);
+	while(!(RCC->CSR & (1 << 1)));
+}

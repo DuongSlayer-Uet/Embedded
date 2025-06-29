@@ -24,6 +24,7 @@
 #include "UART.h"
 #include "Bootflags.h"
 #include "Flash.h"
+#include "IWDG.h"
 
 #if !defined(__SOFT_FP__) && defined(__ARM_FP)
   #warning "FPU is not initialized, but the project is compiling for an FPU. Please initialize the FPU before use."
@@ -50,6 +51,7 @@ int main(void)
 	{
 		GPIO_toggle_pin(GPIOC, 13);
 		delay_1s();
+		IWDG_refresh();
 		if(goToBootloader == 1)
 		{
 			Flash_EraseOnePage((uint32_t)ADDR_FLAGS_START);
