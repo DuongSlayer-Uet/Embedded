@@ -2,6 +2,13 @@
 # Mini OTA bootloader
 Techniques: UART, DMA, Flash layout, Ringbuffer, Github API, Watchdog (IWDG), Lowlevel programming.
 # Mô tả
+*Thông tin thư mục:*
+
+- Application_Firmware: Đây là folder code app (blink led)
+- Factory_Firmware: Đây là folder code factory firmware (Cũng là blink led)
+- OTA_Bootloader: Đây là Main folder, chứa các file chi tiết về bootloader.
+- Esp32_Python: Đây là mã python cho esp32 để download firmware từ github về
+
 *Ý tưởng*: Xây dựng 1 bootloader tự động boot và nạp code.
 
 *Chức năng*: Người dùng push firmware lên github, esp32 sẽ download firmware về và boot/update firmware đó cho stm32
