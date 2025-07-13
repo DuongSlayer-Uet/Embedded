@@ -17,7 +17,7 @@ void IWDG_setup(void)
 	IWDG->PR |= (0b111 << 0);
 
 	// Reload registerr = 1250 ~ 8s
-	IWDG->RLR = 1250;
+	IWDG->RLR = 100;
 
 	// Start IWDG
 	IWDG->KR = 0xAAAA;

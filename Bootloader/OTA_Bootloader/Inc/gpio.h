@@ -38,6 +38,15 @@ typedef struct
  */
 void GPIO_init_output(GPIO_Typedef* gpio, uint8_t pin);
 /*
+ * @brief: GPIOA0 dùng làm bootpin
+ */
+void GPIO_InitBootPin(void);
+/*
+ * @brief: Hàm đọc trạng thái bootpin (PA0)
+ * @retval: Thanh ghi trạng thái 32 bit
+ */
+uint32_t GPIO_ReadBootPin(void);
+/*
  * @brief Set giá trị cho port đã gọi hàm GPIO_init_output
  * @param gpio: con trỏ trỏ đến port A, B, C, D (for example: GPIOA)
  * @param pin: pin thứ ... trên port đã chọn

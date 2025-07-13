@@ -1,11 +1,3 @@
-/**
-Author: Ech Xanh UET
-Description: Đây là main program của bootloader, chương trình này
-có nhiệm vụ check khởi tạo cờ lần đầu tiên, check các cờ khi chip thực hiện reset.
-Ngoài ra, sau mỗi lần nạp, chương trình sẽ nhảy đến vị trí tương ứng (app hoặc factory firmware)
-
- */
-
 #include <stdint.h>
 #include <string.h>
 #include "Flash.h"
@@ -14,74 +6,90 @@ Ngoài ra, sau mỗi lần nạp, chương trình sẽ nhảy đến vị trí t
 #include "RCC.h"
 #include "Ringbuffer.h"
 #include "gpio.h"
-#include "Interrupt.h"
 #include "Bootflags.h"
 #include "IWDG.h"
 
-
-// Flag
-volatile flags_t* flags = ((flags_t*)ADDR_FLAGS_START);
-// Factory Reset Handler function pointer
-typedef void (*factoryFuncPointer)(void);
-// App Reset Handler Function Pointer
-typedef void (*appFuncPointer)(void);
-
-// Function prototype declaration
-// Init
+// System register control (Dùng để reset)
+#define RESET_AIRCR				(*(volatile uint32_t*)0xE000ED0C)
+// Variables
+char cmd_window[5] = {0};
+// Function Pointer
+typedef void (*app1FuncPointer)(void);
+typedef void (*app2FuncPointer)(void);
+// Func prototype declaration
 void Initialization(void);
-// Update Factory firmware
-void UpdateFactoryHandler(void);
-// Update App firmware
-void UpdateApplicationHandler(void);
-// Jump to factory firmware
-void JumpToFactoryFirmware(void);
-// Jump to application firmware
-void JumpToAppFirmware(void);
-// Hàm update firmware
-void UpdateFirmware(uint32_t address, uint16_t next_action_flag);
-// Đẩy mảng sang trái
 void push_char_to_window(char new_char);
+void UpdateFirmware(uint32_t address, uint16_t app_status);
+void JumpToApp1(void);
+void JumpToApp2(void);
 
-// Cái này để fix lỗi cho cái STOP Bug, đảm bảo nhận đúng kí tự
-#define CMD_WINDOW_SIZE 5
-// Buffer này dành cho 'stop' signal
-char cmd_window[CMD_WINDOW_SIZE] = {0};  // Buffer để kiếm tra "STOPP"
+
 
 int main(void)
 {
-	IWDG_setup();
-	// Magic flag giúp báo hiệu đã có flags ở đây
-	if(Flash_ReadWord((uint32_t)(&(flags->magic))) != 0xBEFFDEAD)
+	// Signal Led
+	GPIO_init_output(GPIOC, 13);
+	// BootPin
+	GPIO_InitBootPin();
+
+	uint16_t current_flag = Flash_ReadHalfWord(METADATA_FLAGS_ADDR);
+
+	if(current_flag == 0xFFFF)
 	{
-		Flash_EraseOnePage((uint32_t)ADDR_FLAGS_START);
-		Flash_WriteHalfWord((uint32_t)(&(flags->magic)), (uint16_t)0xDEAD);
-		Flash_WriteHalfWord((uint32_t)(&(flags->magic)) + 2, (uint16_t)0xBEFF);
-		Flash_WriteHalfWord((uint32_t)(&(flags->next_action)), (uint16_t)FLAG_UPDATE_FACTORY);
+		Flash_WriteHalfWord(METADATA_FLAGS_ADDR, FIRSTRUN_FLAG);
 	}
-	switch(flags->next_action)
+
+	// nếu Pin A0 == 0, update
+	if(GPIO_ReadBootPin() == 0)
 	{
-		case FLAG_UPDATE_FACTORY:
-			Initialization();
-			UpdateFactoryHandler();
-			// Receive factory firmware
-			break;
-		case FLAG_UPDATE_APP:
-			Initialization();
-			UpdateApplicationHandler();
-			// Receive app firmware
-			break;
-		case FLAG_RUN_APP:
-			JumpToAppFirmware();
-			// Run app firmware
-			break;
-		case FLAG_RUN_FACTORY:
-			JumpToFactoryFirmware();
-			// Run factory firmware
-			break;
-		default:
-			// Run factory firmware
-			break;
+		switch(current_flag)
+		{
+			case APP1_ACTIVE:
+				// Update app2
+				// Ok => set app2_active
+				// Soft reset
+				Initialization();
+				UpdateFirmware(APP2_START_ADDR, APP2_ACTIVE);
+				break;
+			case APP2_ACTIVE:
+				// Update app1
+				// Ok => set app1_active
+				// Soft reset
+				Initialization();
+				UpdateFirmware(APP1_START_ADDR, APP1_ACTIVE);
+				break;
+			case FIRSTRUN_FLAG:
+				// Update app1
+				// Ok => set app1_active
+				// soft reset
+				Initialization();
+				UpdateFirmware(APP1_START_ADDR, APP1_ACTIVE);
+				break;
+			default:
+				break;
+		}
 	}
+	else		// Else case: Run
+	{
+		switch(current_flag)
+		{
+			case APP1_ACTIVE:
+				JumpToApp1();
+				// Run app1
+				break;
+			case APP2_ACTIVE:
+				JumpToApp2();
+				// Run app2
+				break;
+			case FIRSTRUN_FLAG:
+				// wait
+				while(1);
+			default:
+				break;
+		}
+	}
+
+    /* Loop forever */
 	for(;;);
 }
 
@@ -95,7 +103,6 @@ void Initialization(void)
 	GPIO_init_output(GPIOC, 13);
 	// UART GPIO Init for RX (input, pushpull, pullup) and TX
 	UART1_gpio_init();
-
 	// SETUP DMA
 	// DMA-RX Init
 	UART1_DMA_Setup();
@@ -103,65 +110,7 @@ void Initialization(void)
 	DMA1_Channel5_UART1_RX_setup();
 }
 
-void UpdateFactoryHandler(void)
-{
-	UpdateFirmware((uint32_t)ADDR_FACTORY_START, FLAG_RUN_FACTORY);
-}
-
-void UpdateApplicationHandler(void)
-{
-	UpdateFirmware((uint32_t)ADDR_APP_START, FLAG_RUN_APP);
-}
-
-void JumpToFactoryFirmware(void)
-{
-	// Lấy địa chỉ msp của app
-	uint32_t factory_msp = *(volatile uint32_t*)(ADDR_FACTORY_START);
-	// Lấy địa chỉ resethandler của app
-	uint32_t factory_rshandler = *(volatile uint32_t*)(ADDR_FACTORY_START + 4);
-	// Set msp hiện hành thành msp của app
-	__asm volatile ("msr msp, %0" : : "r" (factory_msp) : );
-	// Set lại offset vector table của app
-	*(uint32_t*)0xE000ED08 = ADDR_FACTORY_START;
-	// Trỏ đến rshander của app
-	factoryFuncPointer fac_pointer = (factoryFuncPointer)factory_rshandler;
-	fac_pointer();
-	while(1);
-}
-
-void JumpToAppFirmware(void)
-{
-	// Lấy địa chỉ msp của app
-	uint32_t app_msp = *(volatile uint32_t*)(ADDR_APP_START);
-	// Lấy địa chỉ resethandler của app
-	uint32_t app_rshandler = *(volatile uint32_t*)(ADDR_APP_START + 4);
-	// Set msp hiện hành thành msp của app
-	__asm volatile ("msr msp, %0" : : "r" (app_msp) : );
-	// Set lại offset vector table của app
-	*(uint32_t*)0xE000ED08 = ADDR_APP_START;
-	// Trỏ đến rshander của app
-	appFuncPointer app_pointer = (appFuncPointer)app_rshandler;
-	app_pointer();
-	while(1);
-}
-
-/*
- * @brief: Hàm này có tác dụng, push data theo kiểu từ phải sang trái
- * 		   Nếu full thì đẩy tiếp, data sẽ thêm ở cuối array và loại bỏ data ở đầu array.
- * 		   Sử dụng cái kỹ thuật này vì, nếu dùng max về 0 như nhận start,
- * 		   Sẽ có các lỗi không mong muốn như 'p\0stop'
- * @param: char new_char (ký tự cần thêm vào arr)
- * @ret val: void
- * */
-void push_char_to_window(char new_char)
-{
-    // Đẩy toàn bộ mảng sang trái 1 ký tự (copy sang trái)
-    memmove(cmd_window, cmd_window + 1, CMD_WINDOW_SIZE - 1);
-    // Gán ký tự mới vào cuối mảng
-    cmd_window[CMD_WINDOW_SIZE - 1] = new_char;
-}
-
-void UpdateFirmware(uint32_t address, uint16_t next_action_flag)
+void UpdateFirmware(uint32_t address, uint16_t app_status)
 {
 	uint32_t current_flash_address = address;
 	uint8_t data;
@@ -184,10 +133,8 @@ void UpdateFirmware(uint32_t address, uint16_t next_action_flag)
 		// Nếu đã nhận được stop, reset ngay, không chờ data nữa
 		if(state == WAIT_STOP)
 		{
-			Flash_EraseOnePage((uint32_t)ADDR_FLAGS_START);
-			Flash_WriteHalfWord((uint32_t)(&(flags->magic)), (uint16_t)0xDEAD);
-			Flash_WriteHalfWord((uint32_t)(&(flags->magic)) + 2, (uint16_t)0xBEFF);
-			Flash_WriteHalfWord((uint32_t)(&(flags->next_action)), (uint16_t)next_action_flag);
+			Flash_EraseOnePage(METADATA_FLAGS_ADDR);
+			Flash_WriteHalfWord(METADATA_FLAGS_ADDR, app_status);
 			GPIO_toggle_pin(GPIOC, 13);
 			// Soft reset, 0x05FA là key, bit 2 là bit reset
 			RESET_AIRCR = (0x05FA << 16) | (1 << 2);
@@ -208,7 +155,7 @@ void UpdateFirmware(uint32_t address, uint16_t next_action_flag)
 					command_buff[cmd_index] = '\0';
 					if(strstr(command_buff, "START"))
 					{
-						// Xóa 10 page bắt đầu từ current_flash_address
+						// Xóa 20 page bắt đầu từ current_flash_address
 						for (int i = 0; i < 20; i++)
 						{
 							Flash_EraseOnePage(current_flash_address + i * 1024);
@@ -228,7 +175,7 @@ void UpdateFirmware(uint32_t address, uint16_t next_action_flag)
 				IWDG_refresh();
 				// Sử dụng kỹ thuật left pushing technique
 				push_char_to_window(data);
-				if (strncmp(cmd_window, "STOPP", CMD_WINDOW_SIZE) == 0)
+				if (strncmp(cmd_window, "STOPP", 5) == 0)
 				{
 					state = WAIT_STOP;
 					break;
@@ -251,4 +198,44 @@ void UpdateFirmware(uint32_t address, uint16_t next_action_flag)
 			}
 		}
 	}
+}
+
+void push_char_to_window(char new_char)
+{
+    // Đẩy toàn bộ mảng sang trái 1 ký tự (copy sang trái)
+    memmove(cmd_window, cmd_window + 1, 5 - 1);
+    // Gán ký tự mới vào cuối mảng
+    cmd_window[5 - 1] = new_char;
+}
+
+void JumpToApp1(void)
+{
+	// Lấy địa chỉ msp của app
+	uint32_t app1_msp = *(volatile uint32_t*)(APP1_START_ADDR);
+	// Lấy địa chỉ resethandler của app
+	uint32_t app1_rshandler = *(volatile uint32_t*)(APP1_START_ADDR + 4);
+	// Set msp hiện hành thành msp của app
+	__asm volatile ("msr msp, %0" : : "r" (app1_msp) : );
+	// Set lại offset vector table của app
+	*(uint32_t*)0xE000ED08 = APP1_START_ADDR;
+	// Trỏ đến rshander của app
+	app1FuncPointer app1_pointer = (app1FuncPointer)app1_rshandler;
+	app1_pointer();
+	while(1);
+}
+
+void JumpToApp2(void)
+{
+	// Lấy địa chỉ msp của app
+	uint32_t app2_msp = *(volatile uint32_t*)(APP2_START_ADDR);
+	// Lấy địa chỉ resethandler của app
+	uint32_t app2_rshandler = *(volatile uint32_t*)(APP2_START_ADDR + 4);
+	// Set msp hiện hành thành msp của app
+	__asm volatile ("msr msp, %0" : : "r" (app2_msp) : );
+	// Set lại offset vector table của app
+	*(uint32_t*)0xE000ED08 = APP2_START_ADDR;
+	// Trỏ đến rshander của app
+	app2FuncPointer app2_pointer = (app2FuncPointer)app2_rshandler;
+	app2_pointer();
+	while(1);
 }

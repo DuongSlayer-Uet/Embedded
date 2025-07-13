@@ -31,9 +31,14 @@ baudrate = 9600
 # Bật uart2
 uart = UART(2, baudrate=baudrate, tx=tx_pin, rx=rx_pin)
 
+# Khởi tạo PD5 (bootpin) và PD18 (Reset pin)
+pin_PD5 = Pin(5, Pin.OUT)
+pin_PD18 = Pin(18, Pin.OUT)
+pin_PD18.value(1)
+pin_PD5.value(1)
+
 # Github Token
-# Tự thêm token vào, github không cho push file chứa token
-# GITHUB_TOKEN = "???"
+GITHUB_TOKEN = ""
 
 # ==== 1. Kết nối WiFi ====
 
@@ -183,8 +188,8 @@ def check_and_update_loop():
     firmware_api_url = "https://api.github.com/repos/DuongSlayer-Uet/Embedded/contents/Firmware/blinkled.bin"
     firmware_path = "blinkgithub.bin"
     last_version = None
-    ssid = "Truong"
-    password = "07052004"
+    ssid = "Iphone"
+    password = "duongbuihihi"
     connect_wifi(ssid, password)
     while True:
         print("Kiểm tra version mới...")
@@ -195,8 +200,17 @@ def check_and_update_loop():
             print(f"Phát hiện version mới: {current_version}")
             # tránh cache cho cả firmware
             if download_firmware_github_api(firmware_api_url, ssid, password, firmware_path):
-                uart.write(b'A')
-                time.sleep(2)
+                # Kéo cả boot pin và rst pin về 0
+                pin_PD5.value(0)
+                pin_PD18.init(Pin.OUT)
+                pin_PD18.value(0)
+                print("Reset for 5 seconds")
+                time.sleep(5)
+                # nhấc rst pin lên trước, boot pin lên sau
+                pin_PD18.value(1)
+                time.sleep(0.1)
+                pin_PD5.value(1)
+                pin_PD18.init(Pin.IN)
                 # Bắt đầu gửi firmware
                 uart.write(b"START")
                 print("Đã gửi START")

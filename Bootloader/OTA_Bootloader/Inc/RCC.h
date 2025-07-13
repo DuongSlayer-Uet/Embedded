@@ -60,6 +60,7 @@ typedef enum
 #define PLLX9			(0b0111 << 18)
 #define PLLX16			(0b1111 << 18)
 
+
 #define RCC_APB2ENR (*(volatile uint32_t*)0x40021018)		// RCC APB2 Enable register
 /*
  * @brief Khởi tạo clock 48Mhz từ HSE
