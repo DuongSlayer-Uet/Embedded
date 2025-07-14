@@ -41,6 +41,16 @@ Thứ hai, trong quá trình thử nghiệm, thay vì việc sử dụng ngắt 
 
 Thứ ba, một bug liên quan đến chuỗi kí tự. Với "START", mình tạo buff và chèn data vào từ trái qua phải, cái này ok. Nhưng với "STOPP", nó không hoạt động. Khi chạy debug, mình phát hiện ra có rất nhiều trường hợp nó nhận về "PPSTO", điều này làm cho việc so sánh chuỗi bị sai. Do đó mình này ra ý tưởng cho nó chèn data từ phải qua trái, lúc này các ký tự cuối sẽ luôn là "STOPP".
 
+### **Fix bug + Update lần III (11/7/2025 - ??)**
+
+Sau lần update trước, có 1 vấn đề là, để nạp được code mà không dùng chân boot và reset, thì sẽ phải sửa firmware và dùng ngắt UART. Điều này gây bất tiện và phải sửa firmware. 
+
+Lần này mình đã fix lại, không dùng ngắt UART nữa. Thay vào đó là boot pin và RST pin. Esp32 sẽ điều khiển 2 pin này bằng gpio. Khi cần update, esp32 kéo rst pin của stm và nó sẽ nhảy về bootloader, lúc này stm check boot pin, nếu đang kéo gnd thì nó nhảy vào receive firmware. 
+
+Như vậy, Firmware sẽ không phải sửa gì cả, hoàn toàn tự động.
+
+Có 1 bug phát sinh đó là soft reset của stm sẽ kéo pin nrst về 0. Trong khi nrst pin kết nối với GPIO của esp và nó đang kéo high. Điều này gây mâu thuẫn khiến cho stm không reset được. Bug này đã được fix bằng cách sau khi stm nhảy vào receive firmware, esp cho gpio về dạng input (floating).
+
 ## Kết luận 
 
 Đã push firmware lên github, sau đó ESP32 boot/update firmware cho stm32 thành công, hoàn toàn tự động.
