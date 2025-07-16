@@ -1,2 +1,2 @@
 blinkled.bin
-version: 7.0
+version: 1.0
