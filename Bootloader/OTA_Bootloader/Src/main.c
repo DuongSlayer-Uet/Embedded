@@ -1,3 +1,10 @@
+/*
+- Dual-bank firmware architecture
+- OTA update capability
+- Watchdog-protected trial boot
+- Automatic rollback to previous firmware on failure
+ */
+
 #include <stdint.h>
 #include <string.h>
 #include "Flash.h"
@@ -11,15 +18,19 @@
 
 // System register control (Dùng để reset)
 #define RESET_AIRCR				(*(volatile uint32_t*)0xE000ED0C)
+// This reg help find the reason of reseting
+#define RCC_CSR					(*(volatile uint32_t*)(0x40021000 + 0x024))
 // Variables
-char cmd_window[5] = {0};
+#define size 5
+char stopBuff[5] = {0};
 // Function Pointer
 typedef void (*app1FuncPointer)(void);
 typedef void (*app2FuncPointer)(void);
 // Func prototype declaration
 void Initialization(void);
 void push_char_to_window(char new_char);
-void UpdateFirmware(uint32_t address, uint16_t app_status);
+void pushCharRightToLeft(char arr[], char c);
+void UpdateFirmware(uint32_t address, uint16_t current_app, uint16_t previous_app);
 void JumpToApp1(void);
 void JumpToApp2(void);
 
@@ -31,13 +42,87 @@ int main(void)
 	GPIO_init_output(GPIOC, 13);
 	// BootPin
 	GPIO_InitBootPin();
-
+	IWDG_setup();
+	// Đọc current flags
 	uint16_t current_flag = Flash_ReadHalfWord(METADATA_FLAGS_ADDR);
-
+	// Đọc old flags
+	uint16_t old_flag = Flash_ReadHalfWord(METADATA_FLAGS_ADDR + 2);
+	// Check chạy lần đầu tiên
 	if(current_flag == 0xFFFF)
 	{
 		Flash_WriteHalfWord(METADATA_FLAGS_ADDR, FIRSTRUN_FLAG);
 	}
+
+	///////////////////////////////////////////////
+	// Check chống treo chương trình mới với IWDG//
+	// Đọc pending update flag (đây là 1 cờ được bật lên khi chương trình mới vừa nạp vào)
+	uint16_t retryCount = Flash_ReadHalfWord(METADATA_COUNTING_ADDR);
+	uint16_t updatePending = Flash_ReadHalfWord(METADATA_PENDING_ADDR);
+	if(updatePending == 1 && (RCC_CSR & (1 << 29)) != 0)
+	{
+		if(retryCount == 0xFFFF)
+		{
+			Flash_EraseOnePage(METADATA_COUNTING_ADDR);
+			Flash_WriteHalfWord(METADATA_COUNTING_ADDR, 0);
+			RCC_CSR |= (1 << 24);		// Clear cờ IWDGRST
+		}
+		if(retryCount < 5)
+		{
+			retryCount++;
+			Flash_EraseOnePage(METADATA_COUNTING_ADDR);
+			Flash_WriteHalfWord(METADATA_COUNTING_ADDR, retryCount);
+			RCC_CSR |= (1 << 24);			// Clear cờ IWDGRST
+		}
+		else if(retryCount == 5)			// Đếm đủ 5 lần try, hết 5 lần thì coi như firmware lỗi
+		{
+			// Xóa pending flag
+			Flash_EraseOnePage(METADATA_PENDING_ADDR);
+			Flash_WriteHalfWord(METADATA_PENDING_ADDR, 0);
+			// Reset count
+			Flash_EraseOnePage(METADATA_COUNTING_ADDR);
+			RCC_CSR |= (1 << 24);			// Clear cờ IWDGRST
+
+			////////////////////////////////////////////////////////////////////////
+			/////		Roll back			///////////////////////////////////////
+			///// Roll back xảy ra khi tryCount new firmware vượt quá 5 lần///////
+			///// Chỉ thực hiện rollback khi có đủ 2 firmware trên hệ thống//////
+			if(old_flag == APP1_OLD)		// Nếu app cũ là app1
+			{
+				Flash_EraseOnePage(METADATA_FLAGS_ADDR);
+				Flash_WriteHalfWord(METADATA_FLAGS_ADDR, APP1_ACTIVE);		// Roll back về app1
+				Flash_WriteHalfWord(METADATA_FLAGS_ADDR + 2, NONE_OLD_VER);
+				for (int i = 0; i < 20; i++)		// Xóa firmware lỗi (app2)
+				{
+					Flash_EraseOnePage(APP2_START_ADDR + i * 1024);
+				}
+				// Soft reset, 0x05FA là key, bit 2 là bit reset
+				RESET_AIRCR = (0x05FA << 16) | (1 << 2);
+				// roll back về app1
+				// set app1 là active app
+				// xóa chương trình firmware lỗi (app2)
+				// set lại cờ app1_old là 0xFFFF
+			}
+			else if(old_flag == APP2_OLD)	// Nếu app cũ là app2
+			{
+				Flash_EraseOnePage(METADATA_FLAGS_ADDR);
+				Flash_WriteHalfWord(METADATA_FLAGS_ADDR, APP2_ACTIVE);		// Roll back về app2
+				Flash_WriteHalfWord(METADATA_FLAGS_ADDR + 2, NONE_OLD_VER);
+				for (int i = 0; i < 20; i++)		// Xóa firmware lỗi (app1)
+				{
+					Flash_EraseOnePage(APP1_START_ADDR + i * 1024);
+				}
+				// Soft reset, 0x05FA là key, bit 2 là bit reset
+				RESET_AIRCR = (0x05FA << 16) | (1 << 2);
+				// roll back về app2
+			}
+			else if(old_flag == NONE_OLD_VER)
+			{
+				while(1);					// Do nothing
+			}
+		}
+	}
+
+
 
 	// nếu Pin A0 == 0, update
 	if(GPIO_ReadBootPin() == 0)
@@ -49,21 +134,21 @@ int main(void)
 				// Ok => set app2_active
 				// Soft reset
 				Initialization();
-				UpdateFirmware(APP2_START_ADDR, APP2_ACTIVE);
+				UpdateFirmware(APP2_START_ADDR, APP2_ACTIVE, APP1_OLD);
 				break;
 			case APP2_ACTIVE:
 				// Update app1
 				// Ok => set app1_active
 				// Soft reset
 				Initialization();
-				UpdateFirmware(APP1_START_ADDR, APP1_ACTIVE);
+				UpdateFirmware(APP1_START_ADDR, APP1_ACTIVE, APP2_OLD);
 				break;
 			case FIRSTRUN_FLAG:
 				// Update app1
 				// Ok => set app1_active
 				// soft reset
 				Initialization();
-				UpdateFirmware(APP1_START_ADDR, APP1_ACTIVE);
+				UpdateFirmware(APP1_START_ADDR, APP1_ACTIVE, NONE_OLD_VER);
 				break;
 			default:
 				break;
@@ -108,9 +193,11 @@ void Initialization(void)
 	UART1_DMA_Setup();
 	// DMA1 Channel5 init (this channel for uart1 rx)
 	DMA1_Channel5_UART1_RX_setup();
+	// IWDG Setup
+
 }
 
-void UpdateFirmware(uint32_t address, uint16_t app_status)
+void UpdateFirmware(uint32_t address, uint16_t current_app, uint16_t previous_app)
 {
 	uint32_t current_flash_address = address;
 	uint8_t data;
@@ -126,15 +213,19 @@ void UpdateFirmware(uint32_t address, uint16_t app_status)
 	// Set trạng thái đầu tiên luôn ở Wait_start
 	uint8_t state = WAIT_START;
 	// Buffer này dành cho 'start' signal
-	char command_buff[6] = {0};
-	uint8_t cmd_index = 0;
+	char startBuff[6] = {0};
+	uint8_t startCharIndex = 0;
 	while(1)
 	{
 		// Nếu đã nhận được stop, reset ngay, không chờ data nữa
 		if(state == WAIT_STOP)
 		{
 			Flash_EraseOnePage(METADATA_FLAGS_ADDR);
-			Flash_WriteHalfWord(METADATA_FLAGS_ADDR, app_status);
+			Flash_WriteHalfWord(METADATA_FLAGS_ADDR, current_app);
+			Flash_WriteHalfWord(METADATA_FLAGS_ADDR + 2, previous_app);			// Ghi tại vị trí flags+2 cờ old app hiện tại
+			// Phiên chạy thử
+			Flash_EraseOnePage(METADATA_PENDING_ADDR);
+			Flash_WriteHalfWord(METADATA_PENDING_ADDR, UPDATEPENDING);
 			GPIO_toggle_pin(GPIOC, 13);
 			// Soft reset, 0x05FA là key, bit 2 là bit reset
 			RESET_AIRCR = (0x05FA << 16) | (1 << 2);
@@ -147,35 +238,36 @@ void UpdateFirmware(uint32_t address, uint16_t app_status)
 			switch(state)
 			{
 			case WAIT_START:
-				if(cmd_index < sizeof(command_buff) - 1)
+				if(startCharIndex < sizeof(startBuff) - 1)
 				{
 					// Toán tử index++, gán data sau đó mới cộng
-					command_buff[cmd_index++] = data;
+					startBuff[startCharIndex++] = data;
 					// Kết thúc bằng \0 để báo hiệu kết thúc chuỗi và so sánh
-					command_buff[cmd_index] = '\0';
-					if(strstr(command_buff, "START"))
+					startBuff[startCharIndex] = '\0';
+					if(strstr(startBuff, "START"))
 					{
 						// Xóa 20 page bắt đầu từ current_flash_address
 						for (int i = 0; i < 20; i++)
 						{
 							Flash_EraseOnePage(current_flash_address + i * 1024);
 						}
-						cmd_index = 0;
+						startCharIndex = 0;
 						has_tmp_data = 0;
 						state = RECEIVING;
 					}
 				}
 				else
 				{
-					cmd_index = 0;
+					startCharIndex = 0;
 				}
 				break;
 			case RECEIVING:
 				// Refresh Watchdog
 				IWDG_refresh();
 				// Sử dụng kỹ thuật left pushing technique
-				push_char_to_window(data);
-				if (strncmp(cmd_window, "STOPP", 5) == 0)
+				pushCharRightToLeft(stopBuff, data);
+				//push_char_to_window(data);
+				if (strncmp(stopBuff, "STOPP", 5) == 0)
 				{
 					state = WAIT_STOP;
 					break;
@@ -203,9 +295,18 @@ void UpdateFirmware(uint32_t address, uint16_t app_status)
 void push_char_to_window(char new_char)
 {
     // Đẩy toàn bộ mảng sang trái 1 ký tự (copy sang trái)
-    memmove(cmd_window, cmd_window + 1, 5 - 1);
+    memmove(stopBuff, stopBuff + 1, 5 - 1);
     // Gán ký tự mới vào cuối mảng
-    cmd_window[5 - 1] = new_char;
+    stopBuff[5 - 1] = new_char;
+}
+
+void pushCharRightToLeft(char arr[], char c)
+{
+    for(int i = 0; i < size - 1; i++)
+    {
+        arr[i] = arr[i + 1];
+    }
+    arr[size - 1] = c;
 }
 
 void JumpToApp1(void)

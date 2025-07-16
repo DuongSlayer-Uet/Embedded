@@ -16,7 +16,8 @@ typedef enum
 	APP1_OLD,
 	APP2_ACTIVE,
 	APP2_OLD,
-	FIRSTRUN_FLAG
+	FIRSTRUN_FLAG,
+	NONE_OLD_VER
 } Flags_t;
 
 // Flag address definition
@@ -24,6 +25,11 @@ typedef enum
 #define APP1_START_ADDR				0x08002000		// 20 page from 0x08002000 - 0x08006FFF
 #define APP2_START_ADDR				0x08007000		// 20 page from 0x08007000 - 0x0800BFFF
 #define METADATA_FLAGS_ADDR			0x0800C800		// 1kb (1page) for flags from 0x0800C800 - 0x0800CFFF
+#define METADATA_PENDING_ADDR		(METADATA_FLAGS_ADDR + 0x400)
+#define METADATA_COUNTING_ADDR		(METADATA_FLAGS_ADDR + 0x800)
+
+#define UPDATEPENDING				1
+#define UPDATECOMP					0
 
 
 #endif /* BOOTFLAGS_H_ */
