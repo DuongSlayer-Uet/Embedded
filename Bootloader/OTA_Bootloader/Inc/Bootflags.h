@@ -28,8 +28,8 @@ typedef enum
 #define METADATA_PENDING_ADDR		(METADATA_FLAGS_ADDR + 0x400)
 #define METADATA_COUNTING_ADDR		(METADATA_FLAGS_ADDR + 0x800)
 
-#define UPDATEPENDING				1
-#define UPDATECOMP					0
+#define UPDATEPENDING				1				// Cờ này bật lên khi vừa upfirmware lên, chờ chạy trial
+#define UPDATECOMP					0				// Cờ này bật lên khi trial xong
 
 
 #endif /* BOOTFLAGS_H_ */

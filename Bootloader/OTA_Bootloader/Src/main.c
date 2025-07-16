@@ -28,7 +28,6 @@ typedef void (*app1FuncPointer)(void);
 typedef void (*app2FuncPointer)(void);
 // Func prototype declaration
 void Initialization(void);
-void push_char_to_window(char new_char);
 void pushCharRightToLeft(char arr[], char c);
 void UpdateFirmware(uint32_t address, uint16_t current_app, uint16_t previous_app);
 void JumpToApp1(void);
@@ -42,6 +41,7 @@ int main(void)
 	GPIO_init_output(GPIOC, 13);
 	// BootPin
 	GPIO_InitBootPin();
+	// Bật Watchdog
 	IWDG_setup();
 	// Đọc current flags
 	uint16_t current_flag = Flash_ReadHalfWord(METADATA_FLAGS_ADDR);
@@ -53,7 +53,7 @@ int main(void)
 		Flash_WriteHalfWord(METADATA_FLAGS_ADDR, FIRSTRUN_FLAG);
 	}
 
-	///////////////////////////////////////////////
+	////////////////////////////////////////////////
 	// Check chống treo chương trình mới với IWDG//
 	// Đọc pending update flag (đây là 1 cờ được bật lên khi chương trình mới vừa nạp vào)
 	uint16_t retryCount = Flash_ReadHalfWord(METADATA_COUNTING_ADDR);
@@ -84,10 +84,14 @@ int main(void)
 
 			////////////////////////////////////////////////////////////////////////
 			/////		Roll back			///////////////////////////////////////
-			///// Roll back xảy ra khi tryCount new firmware vượt quá 5 lần///////
+			///// Roll back xảy ra khi retryCount new firmware vượt quá 5 lần/////
 			///// Chỉ thực hiện rollback khi có đủ 2 firmware trên hệ thống//////
 			if(old_flag == APP1_OLD)		// Nếu app cũ là app1
 			{
+				// roll back về app1
+				// set app1 là active app
+				// xóa chương trình firmware lỗi (app2)
+				// set lại cờ app1_old là 0xFFFF
 				Flash_EraseOnePage(METADATA_FLAGS_ADDR);
 				Flash_WriteHalfWord(METADATA_FLAGS_ADDR, APP1_ACTIVE);		// Roll back về app1
 				Flash_WriteHalfWord(METADATA_FLAGS_ADDR + 2, NONE_OLD_VER);
@@ -97,13 +101,13 @@ int main(void)
 				}
 				// Soft reset, 0x05FA là key, bit 2 là bit reset
 				RESET_AIRCR = (0x05FA << 16) | (1 << 2);
-				// roll back về app1
-				// set app1 là active app
-				// xóa chương trình firmware lỗi (app2)
-				// set lại cờ app1_old là 0xFFFF
 			}
 			else if(old_flag == APP2_OLD)	// Nếu app cũ là app2
 			{
+				// roll back về app2
+				// set app2 là active app
+				// xóa chương trình firmware lỗi (app2)
+				// set lại cờ app2_old là 0xFFFF
 				Flash_EraseOnePage(METADATA_FLAGS_ADDR);
 				Flash_WriteHalfWord(METADATA_FLAGS_ADDR, APP2_ACTIVE);		// Roll back về app2
 				Flash_WriteHalfWord(METADATA_FLAGS_ADDR + 2, NONE_OLD_VER);
@@ -121,7 +125,6 @@ int main(void)
 			}
 		}
 	}
-
 
 
 	// nếu Pin A0 == 0, update
@@ -266,7 +269,6 @@ void UpdateFirmware(uint32_t address, uint16_t current_app, uint16_t previous_ap
 				IWDG_refresh();
 				// Sử dụng kỹ thuật left pushing technique
 				pushCharRightToLeft(stopBuff, data);
-				//push_char_to_window(data);
 				if (strncmp(stopBuff, "STOPP", 5) == 0)
 				{
 					state = WAIT_STOP;
@@ -290,14 +292,6 @@ void UpdateFirmware(uint32_t address, uint16_t current_app, uint16_t previous_ap
 			}
 		}
 	}
-}
-
-void push_char_to_window(char new_char)
-{
-    // Đẩy toàn bộ mảng sang trái 1 ký tự (copy sang trái)
-    memmove(stopBuff, stopBuff + 1, 5 - 1);
-    // Gán ký tự mới vào cuối mảng
-    stopBuff[5 - 1] = new_char;
 }
 
 void pushCharRightToLeft(char arr[], char c)
