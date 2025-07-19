@@ -15,7 +15,7 @@ Feature:
     - Dễ bảo trì,...
 Github repo: https://github.com/DuongSlayer-Uet/Embedded
 
-Update time: 20/6/2025
+Update time: 19/7/2025
 """
 import network
 import urequests
@@ -47,9 +47,9 @@ pin_PD5.value(1)
 # Github Token
 GITHUB_TOKEN = ""
 
-# ==== 1. Kết nối WiFi ====
-
-
+# Brief: Kết nối wifi
+# Param: ssid - tên wifi
+# Param: password - Mật khẩu
 def connect_wifi(ssid, password):
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
@@ -60,7 +60,9 @@ def connect_wifi(ssid, password):
             time.sleep(0.5)
     print("[ESP32] Kết nối WiFi thành công:", wlan.ifconfig())
 
-
+# Brief: Kết nối lại wifi
+# Param: ssid
+# Param: password
 def ensure_wifi_connection(ssid, password):
     wlan = network.WLAN(network.STA_IF)
     while not wlan.isconnected():
@@ -72,55 +74,8 @@ def ensure_wifi_connection(ssid, password):
             print("[ESP32] Đã kết nối WiFi thành công!")
     return True
 
-
-# ==== 2. Đọc version từ GitHub ====
-def get_online_version(ver_url, ssid, password):
-    try:
-        ensure_wifi_connection(ssid, password)
-        r = urequests.get(ver_url)
-        version = r.text.strip()
-        print("[ESP32] Version hiện tại: ", version)
-        r.close()
-        return version
-    except Exception as e:
-        print("Lỗi khi lấy ver.txt:", e)
-        return None
-
-# ==== 3. Tải firmware và lưu ====
-
-
-def download_and_save_firmware(url, ssid, password, save_path="/blinkgithub.bin"):
-    ensure_wifi_connection(ssid, password)
-    print("[ESP32] Đang tải và lưu firmware từ:", url)
-    try:
-        r = urequests.get(url)
-        if r.status_code != 200:
-            r.close()
-            print("Không tải được file:", r.status_code)
-            return False
-
-        with open(save_path, "wb") as f:
-            total = 0
-            chunk_size = 256
-            while True:
-                chunk = r.raw.read(chunk_size)
-                if not chunk:
-                    break
-                f.write(chunk)
-                total += len(chunk)
-                print("[ESP32] Đã ghi:", total, "bytes")
-                time.sleep(0.01)
-
-        r.close()
-        print("[ESP32] Đã lưu firmware vào:", save_path)
-        return True
-    except Exception as e:
-        print("Lỗi khi tải hoặc lưu:", e)
-        return False
-
-# ==== 4. Gửi file qua UART ====
-
-
+# Brief: Gửi firmware qua UART1
+# Param: File path - đường dẫn lưu file
 def send_firmware_uart(file_path):
     print("[ESP32] Đang gửi firmware qua UART...")
 
@@ -140,7 +95,10 @@ def send_firmware_uart(file_path):
     except Exception as e:
         print("Lỗi khi gửi UART:", e)
 
-
+# Brief: Lấy file version hiện tại
+# Param: api_url - đường dẫn đến file trên github
+# Param: ssid
+# Param: password
 def get_online_version_github_api(api_url, ssid, password):
     try:
         ensure_wifi_connection(ssid, password)
@@ -162,10 +120,9 @@ def get_online_version_github_api(api_url, ssid, password):
     except Exception as e:
         print("Lỗi khi lấy version từ API:", e)
         return None
+    
 # Brief: Hàm download firmware từ github bằng token
 # Param: api_url (link firmware), ssid, password, save_path
-
-
 def download_firmware_github_api(api_url, ssid, password, save_path="/blinkgithub.bin"):
     try:
         ensure_wifi_connection(ssid, password)
@@ -189,11 +146,10 @@ def download_firmware_github_api(api_url, ssid, password, save_path="/blinkgithu
     except Exception as e:
         print("Lỗi khi tải firmware API:", e)
         return False
+    
 # Brief: Hàm xử lý ngắt cho rx
 # Param: Ngắt UARTn (vd: Uart1,...)
 # Retval: void
-
-
 def uart_irq_rx_handler(uart_inst):
     global rx_buffer
     while uart_inst.any():
@@ -211,9 +167,7 @@ def uart_irq_rx_handler(uart_inst):
 # Đăng kí ngắt RX
 uart.irq(handler=uart_irq_rx_handler, trigger=UART.IRQ_RX)
 
-# ==== 5. Main loop kiểm tra version ====
-
-
+# Hàm main
 def check_and_update_loop():
     base_version_url = "https://api.github.com/repos/DuongSlayer-Uet/Embedded/contents/Firmware/version.txt"
     firmware_api_url = "https://api.github.com/repos/DuongSlayer-Uet/Embedded/contents/Firmware/blinkled.bin"
