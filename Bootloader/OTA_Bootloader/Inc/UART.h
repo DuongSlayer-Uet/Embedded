@@ -67,7 +67,15 @@ char UART1_reveive_data(void);
  * @retval none
  */
 void UART1_RX_Int_setup(void);
-
+/*
+ * @brief: bật dma1 channel5
+ * @param void
+ */
 void UART1_DMA_Setup(void);
+/*
+ * @briefgửi log infor
+ * @param char* string
+ */
+void UART_Log(char str[]);
 
 #endif /* UART_H_ */

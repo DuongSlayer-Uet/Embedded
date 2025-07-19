@@ -15,6 +15,7 @@
 #include "gpio.h"
 #include "Bootflags.h"
 #include "IWDG.h"
+#include "Timer.h"
 
 // System register control (Dùng để reset)
 #define RESET_AIRCR				(*(volatile uint32_t*)0xE000ED0C)
@@ -41,8 +42,8 @@ int main(void)
 	GPIO_init_output(GPIOC, 13);
 	// BootPin
 	GPIO_InitBootPin();
-	// Bật Watchdog
-	IWDG_setup();
+	// Khởi tạo timer, dma, iwdg
+	Initialization();
 	// Đọc current flags
 	uint16_t current_flag = Flash_ReadHalfWord(METADATA_FLAGS_ADDR);
 	// Đọc old flags
@@ -62,12 +63,14 @@ int main(void)
 	{
 		if(retryCount == 0xFFFF)
 		{
+			//UART_Log("[STM32] Lỗi Firmware, retry\n");
 			Flash_EraseOnePage(METADATA_COUNTING_ADDR);
 			Flash_WriteHalfWord(METADATA_COUNTING_ADDR, 0);
 			RCC_CSR |= (1 << 24);		// Clear cờ IWDGRST
 		}
 		if(retryCount < 5)
 		{
+			UART_Log("[STM32] Lỗi Firmware, retry\n");
 			retryCount++;
 			Flash_EraseOnePage(METADATA_COUNTING_ADDR);
 			Flash_WriteHalfWord(METADATA_COUNTING_ADDR, retryCount);
@@ -75,6 +78,7 @@ int main(void)
 		}
 		else if(retryCount == 5)			// Đếm đủ 5 lần try, hết 5 lần thì coi như firmware lỗi
 		{
+			UART_Log("[STM32] ROLL BACK!\n");
 			// Xóa pending flag
 			Flash_EraseOnePage(METADATA_PENDING_ADDR);
 			Flash_WriteHalfWord(METADATA_PENDING_ADDR, 0);
@@ -130,27 +134,36 @@ int main(void)
 	// nếu Pin A0 == 0, update
 	if(GPIO_ReadBootPin() == 0)
 	{
+		UART_Log("[STM32] Bootmode\n");
 		switch(current_flag)
 		{
 			case APP1_ACTIVE:
 				// Update app2
 				// Ok => set app2_active
 				// Soft reset
-				Initialization();
+				//Initialization();
+				UART_Log("[STM32] APP1 ACTIVE\n");
+				UART_Log("[STM32] APP2 OLD\n");
+				UART_Log("[STM32] UPDATE APP2...\n");
 				UpdateFirmware(APP2_START_ADDR, APP2_ACTIVE, APP1_OLD);
 				break;
 			case APP2_ACTIVE:
 				// Update app1
 				// Ok => set app1_active
 				// Soft reset
-				Initialization();
+				//Initialization();
+				UART_Log("[STM32] APP2 ACTIVE\n");
+				UART_Log("[STM32] APP1 OLD\n");
+				UART_Log("[STM32] UPDATE APP1...\n");
 				UpdateFirmware(APP1_START_ADDR, APP1_ACTIVE, APP2_OLD);
 				break;
 			case FIRSTRUN_FLAG:
 				// Update app1
 				// Ok => set app1_active
 				// soft reset
-				Initialization();
+				//Initialization();
+				UART_Log("[STM32] First Run!\n");
+				UART_Log("[STM32] Gonna Update APP1\n");
 				UpdateFirmware(APP1_START_ADDR, APP1_ACTIVE, NONE_OLD_VER);
 				break;
 			default:
@@ -162,16 +175,30 @@ int main(void)
 		switch(current_flag)
 		{
 			case APP1_ACTIVE:
+				if(updatePending == 0)
+				{
+					UART_Log("[STM32] APP1_ACTIVE\n");
+				}
+
 				JumpToApp1();
 				// Run app1
 				break;
 			case APP2_ACTIVE:
+				if(updatePending == 0)
+				{
+					UART_Log("[STM32] APP2_ACTIVE\n");
+				}
 				JumpToApp2();
 				// Run app2
 				break;
 			case FIRSTRUN_FLAG:
+				UART_Log("[STM32] Do not have any firmware!\n");
 				// wait
-				while(1);
+				while(1)
+				{
+					IWDG_refresh();
+					delay_1s();
+				}
 			default:
 				break;
 		}
@@ -196,8 +223,10 @@ void Initialization(void)
 	UART1_DMA_Setup();
 	// DMA1 Channel5 init (this channel for uart1 rx)
 	DMA1_Channel5_UART1_RX_setup();
-	// IWDG Setup
-
+	// Bật Watchdog
+	IWDG_setup();
+	// Timer
+	setup_timer1();
 }
 
 void UpdateFirmware(uint32_t address, uint16_t current_app, uint16_t previous_app)
@@ -220,6 +249,7 @@ void UpdateFirmware(uint32_t address, uint16_t current_app, uint16_t previous_ap
 	uint8_t startCharIndex = 0;
 	while(1)
 	{
+		IWDG_refresh();
 		// Nếu đã nhận được stop, reset ngay, không chờ data nữa
 		if(state == WAIT_STOP)
 		{
@@ -243,6 +273,7 @@ void UpdateFirmware(uint32_t address, uint16_t current_app, uint16_t previous_ap
 			case WAIT_START:
 				if(startCharIndex < sizeof(startBuff) - 1)
 				{
+					IWDG_refresh();
 					// Toán tử index++, gán data sau đó mới cộng
 					startBuff[startCharIndex++] = data;
 					// Kết thúc bằng \0 để báo hiệu kết thúc chuỗi và so sánh
@@ -257,6 +288,8 @@ void UpdateFirmware(uint32_t address, uint16_t current_app, uint16_t previous_ap
 						startCharIndex = 0;
 						has_tmp_data = 0;
 						state = RECEIVING;
+						UART_Log("[STM32] START OK!\n");
+						UART_Log("[STM32] Receiving\n");
 					}
 				}
 				else
@@ -272,6 +305,8 @@ void UpdateFirmware(uint32_t address, uint16_t current_app, uint16_t previous_ap
 				if (strncmp(stopBuff, "STOPP", 5) == 0)
 				{
 					state = WAIT_STOP;
+					UART_Log("[STM32] STOP OK!\n");
+					UART_Log("[STM32] Received Successfully\n");
 					break;
 				}
 				if(!has_tmp_data)	// biến has tmp data để hỗ trợ việc ghép 2 data và tmp_data
@@ -333,4 +368,9 @@ void JumpToApp2(void)
 	app2FuncPointer app2_pointer = (app2FuncPointer)app2_rshandler;
 	app2_pointer();
 	while(1);
+}
+
+void HardFault_Handler(void)
+{
+	GPIO_toggle_pin(GPIOC, 13);
 }

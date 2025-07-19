@@ -75,3 +75,11 @@ uint32_t Flash_ReadWord(uint32_t address)
 {
 	return (*(volatile uint32_t*)address);
 }
+
+void Flash_eraseMultiplePage(uint32_t address, uint16_t num)
+{
+	for (int i = 0; i < num; i++)		// Xóa firmware lỗi (app2)
+	{
+		Flash_EraseOnePage(address + i * 1024);
+	}
+}

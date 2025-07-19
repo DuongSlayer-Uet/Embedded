@@ -41,4 +41,6 @@ uint16_t Flash_ReadHalfWord(uint32_t address);
 
 uint32_t Flash_ReadWord(uint32_t address);
 
+void Flash_eraseMultiplePage(uint32_t address, uint16_t num);
+
 #endif /* FLASH_H_ */
