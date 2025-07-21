@@ -1,2 +1,2 @@
-blinkled.bin
-version: 1.0
+APP1: version 1.0.1
+APP2: version 1.0.0
