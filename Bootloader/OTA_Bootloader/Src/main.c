@@ -1,211 +1,157 @@
-/*
-- Dual-bank firmware architecture
-- OTA update capability
-- Watchdog-protected trial boot
-- Automatic rollback to previous firmware on failure
- */
-
 #include <stdint.h>
 #include <string.h>
+#include "Metadata.h"
 #include "Flash.h"
 #include "DMA.h"
 #include "UART.h"
 #include "RCC.h"
 #include "Ringbuffer.h"
 #include "gpio.h"
-#include "Bootflags.h"
 #include "IWDG.h"
 #include "Timer.h"
 
-// System register control (Dùng để reset)
+// System register control - thanh ghi soft reset
 #define RESET_AIRCR				(*(volatile uint32_t*)0xE000ED0C)
-// This reg help find the reason of reseting
+// CSR - Thanh ghi truy vết reset
 #define RCC_CSR					(*(volatile uint32_t*)(0x40021000 + 0x024))
-// Variables
-#define size 5
-char stopBuff[5] = {0};
-// Function Pointer
+// STOP buff size
+#define STOPBUFFSIZE			5
+// START buff size
+#define STARTBUFFSIZE			5
+// start buffer
+char startBuff[STARTBUFFSIZE] = {0};
+// stop buffer
+char stopBuff[STOPBUFFSIZE] = {0};
+// Function pointer
 typedef void (*app1FuncPointer)(void);
 typedef void (*app2FuncPointer)(void);
-// Func prototype declaration
+// enum for receive state
+typedef enum
+{
+	WAIT_START,
+	RECEIVING,
+	WAIT_STOP
+} receiveState_t;
+// gán trạng thái đầu tiên là chờ bắt đầu
+receiveState_t	receiveState = WAIT_START;
+
+// function prototype
 void Initialization(void);
+void updateFirmware(uint32_t address, uint32_t current_app, uint32_t previous_app);
 void pushCharRightToLeft(char arr[], char c);
-void UpdateFirmware(uint32_t address, uint16_t current_app, uint16_t previous_app);
 void JumpToApp1(void);
 void JumpToApp2(void);
-
-
+void rollBack(void);
 
 int main(void)
 {
-	// Signal Led
-	GPIO_init_output(GPIOC, 13);
-	// BootPin
-	GPIO_InitBootPin();
-	// Khởi tạo timer, dma, iwdg
+	// peripherals init
 	Initialization();
-	// Đọc current flags
-	uint16_t current_flag = Flash_ReadHalfWord(METADATA_FLAGS_ADDR);
-	// Đọc old flags
-	uint16_t old_flag = Flash_ReadHalfWord(METADATA_FLAGS_ADDR + 2);
-	// Check chạy lần đầu tiên
-	if(current_flag == 0xFFFF)
+	// rollback !!!
+	rollBack();
+	Metadata_t mainMetadata;
+	Flash_readMetadata(&mainMetadata);
+	// First run checking
+	if(Flash_ReadHalfWord((uint32_t)&metadata->activeFirmwareStatus) == 0xFFFF)
 	{
-		Flash_WriteHalfWord(METADATA_FLAGS_ADDR, FIRSTRUN_FLAG);
+		Flash_WriteHalfWord((uint32_t)&metadata->activeFirmwareStatus, FIRST_RUN);
 	}
-
-	////////////////////////////////////////////////
-	// Check chống treo chương trình mới với IWDG//
-	// Đọc pending update flag (đây là 1 cờ được bật lên khi chương trình mới vừa nạp vào)
-	uint16_t retryCount = Flash_ReadHalfWord(METADATA_COUNTING_ADDR);
-	uint16_t updatePending = Flash_ReadHalfWord(METADATA_PENDING_ADDR);
-	if(updatePending == 1 && (RCC_CSR & (1 << 29)) != 0)
-	{
-		if(retryCount == 0xFFFF)
-		{
-			//UART_Log("[STM32] Lỗi Firmware, retry\n");
-			Flash_EraseOnePage(METADATA_COUNTING_ADDR);
-			Flash_WriteHalfWord(METADATA_COUNTING_ADDR, 0);
-			RCC_CSR |= (1 << 24);		// Clear cờ IWDGRST
-		}
-		if(retryCount < 5)
-		{
-			UART_Log("[STM32] Lỗi Firmware, retry\n");
-			retryCount++;
-			Flash_EraseOnePage(METADATA_COUNTING_ADDR);
-			Flash_WriteHalfWord(METADATA_COUNTING_ADDR, retryCount);
-			RCC_CSR |= (1 << 24);			// Clear cờ IWDGRST
-		}
-		else if(retryCount == 5)			// Đếm đủ 5 lần try, hết 5 lần thì coi như firmware lỗi
-		{
-			UART_Log("[STM32] ROLL BACK!\n");
-			// Xóa pending flag
-			Flash_EraseOnePage(METADATA_PENDING_ADDR);
-			Flash_WriteHalfWord(METADATA_PENDING_ADDR, 0);
-			// Reset count
-			Flash_EraseOnePage(METADATA_COUNTING_ADDR);
-			RCC_CSR |= (1 << 24);			// Clear cờ IWDGRST
-
-			////////////////////////////////////////////////////////////////////////
-			/////		Roll back			///////////////////////////////////////
-			///// Roll back xảy ra khi retryCount new firmware vượt quá 5 lần/////
-			///// Chỉ thực hiện rollback khi có đủ 2 firmware trên hệ thống//////
-			if(old_flag == APP1_OLD)		// Nếu app cũ là app1
-			{
-				// roll back về app1
-				// set app1 là active app
-				// xóa chương trình firmware lỗi (app2)
-				// set lại cờ app1_old là 0xFFFF
-				Flash_EraseOnePage(METADATA_FLAGS_ADDR);
-				Flash_WriteHalfWord(METADATA_FLAGS_ADDR, APP1_ACTIVE);		// Roll back về app1
-				Flash_WriteHalfWord(METADATA_FLAGS_ADDR + 2, NONE_OLD_VER);
-				for (int i = 0; i < 20; i++)		// Xóa firmware lỗi (app2)
-				{
-					Flash_EraseOnePage(APP2_START_ADDR + i * 1024);
-				}
-				// Soft reset, 0x05FA là key, bit 2 là bit reset
-				RESET_AIRCR = (0x05FA << 16) | (1 << 2);
-			}
-			else if(old_flag == APP2_OLD)	// Nếu app cũ là app2
-			{
-				// roll back về app2
-				// set app2 là active app
-				// xóa chương trình firmware lỗi (app2)
-				// set lại cờ app2_old là 0xFFFF
-				Flash_EraseOnePage(METADATA_FLAGS_ADDR);
-				Flash_WriteHalfWord(METADATA_FLAGS_ADDR, APP2_ACTIVE);		// Roll back về app2
-				Flash_WriteHalfWord(METADATA_FLAGS_ADDR + 2, NONE_OLD_VER);
-				for (int i = 0; i < 20; i++)		// Xóa firmware lỗi (app1)
-				{
-					Flash_EraseOnePage(APP1_START_ADDR + i * 1024);
-				}
-				// Soft reset, 0x05FA là key, bit 2 là bit reset
-				RESET_AIRCR = (0x05FA << 16) | (1 << 2);
-				// roll back về app2
-			}
-			else if(old_flag == NONE_OLD_VER)
-			{
-				while(1);					// Do nothing
-			}
-		}
-	}
-
-
 	// nếu Pin A0 == 0, update
 	if(GPIO_ReadBootPin() == 0)
 	{
-		UART_Log("[STM32] Bootmode\n");
-		switch(current_flag)
+		UART_Log("[STM32] Boot Mode\n");
+		switch(Flash_ReadHalfWord((uint32_t)&metadata->activeFirmwareStatus))
 		{
-			case APP1_ACTIVE:
-				// Update app2
-				// Ok => set app2_active
-				// Soft reset
-				//Initialization();
-				UART_Log("[STM32] APP1 ACTIVE\n");
-				UART_Log("[STM32] APP2 OLD\n");
-				UART_Log("[STM32] UPDATE APP2...\n");
-				UpdateFirmware(APP2_START_ADDR, APP2_ACTIVE, APP1_OLD);
-				break;
-			case APP2_ACTIVE:
-				// Update app1
-				// Ok => set app1_active
-				// Soft reset
-				//Initialization();
-				UART_Log("[STM32] APP2 ACTIVE\n");
-				UART_Log("[STM32] APP1 OLD\n");
-				UART_Log("[STM32] UPDATE APP1...\n");
-				UpdateFirmware(APP1_START_ADDR, APP1_ACTIVE, APP2_OLD);
-				break;
-			case FIRSTRUN_FLAG:
-				// Update app1
-				// Ok => set app1_active
-				// soft reset
-				//Initialization();
-				UART_Log("[STM32] First Run!\n");
-				UART_Log("[STM32] Gonna Update APP1\n");
-				UpdateFirmware(APP1_START_ADDR, APP1_ACTIVE, NONE_OLD_VER);
-				break;
-			default:
-				break;
+		case APP1_ACTIVE:
+			UART_Log("[STM32] APP1_ACTIVE\n");
+			UART_Log("[STM32] APP2_OLD\n");
+			UART_Log("[STM32] Gonna update APP2\n");
+			updateFirmware(APP2_START_ADDR, APP2_ACTIVE, APP1_OLD);
+			break;
+		case APP2_ACTIVE:
+			UART_Log("[STM32] APP2_ACTIVE\n");
+			UART_Log("[STM32] APP1_OLD\n");
+			UART_Log("[STM32] Gonna update APP1\n");
+			updateFirmware(APP1_START_ADDR, APP1_ACTIVE, APP2_OLD);
+			break;
+		case FIRST_RUN:
+			UART_Log("[STM32] First RUN!\n");
+			updateFirmware(APP1_START_ADDR, APP1_ACTIVE, NO_OLD_VER);
+			break;
+		default:
+			break;
 		}
 	}
-	else		// Else case: Run
+	else
 	{
-		switch(current_flag)
+		switch(Flash_ReadHalfWord((uint32_t)&metadata->activeFirmwareStatus))
 		{
-			case APP1_ACTIVE:
-				if(updatePending == 0)
-				{
-					UART_Log("[STM32] APP1_ACTIVE\n");
-				}
-
-				JumpToApp1();
-				// Run app1
-				break;
-			case APP2_ACTIVE:
-				if(updatePending == 0)
-				{
-					UART_Log("[STM32] APP2_ACTIVE\n");
-				}
-				JumpToApp2();
-				// Run app2
-				break;
-			case FIRSTRUN_FLAG:
-				UART_Log("[STM32] Do not have any firmware!\n");
-				// wait
-				while(1)
-				{
-					IWDG_refresh();
-					delay_1s();
-				}
-			default:
-				break;
+		case APP1_ACTIVE:
+			UART_Log("[STM32] Jump to APP1!\n");
+			JumpToApp1();
+			break;
+		case APP2_ACTIVE:
+			UART_Log("[STM32] Jump to APP2!\n");
+			JumpToApp2();
+			break;
+		case FIRST_RUN:
+			while(1)
+			{
+				IWDG_refresh();
+				delay_ms(200);
+			}
+			break;
+		default:
+			break;
 		}
 	}
-
-    /* Loop forever */
+    // Loop
 	for(;;);
+}
+
+void rollBack(void)
+{
+	Metadata_t rollbackMetadata;
+	Flash_readMetadata(&rollbackMetadata);
+	if(rollbackMetadata.trialBootFlag == 1 && (RCC_CSR & (1 << 29)) != 0)
+	{
+		if(rollbackMetadata.trialBootCount < MAX_TRIAL_BOOT)
+		{
+			UART_Log("[STM32] Lỗi Firmware, retry\n");
+			rollbackMetadata.trialBootCount = rollbackMetadata.trialBootCount + 1;
+			Flash_eraseMetadata();
+			Flash_writeMetadata(&rollbackMetadata);
+			RCC_CSR |= (1 << 24);
+		}
+		else
+		{
+			UART_Log("[STM32] ROLL BACK!\n");
+			rollbackMetadata.trialBootCount = 0xFFFF;
+			rollbackMetadata.trialBootFlag = TRIAL_MODE_STOP;
+			if(rollbackMetadata.oldFirmwareStatus == APP1_OLD)
+			{
+				rollbackMetadata.activeFirmwareStatus = APP1_ACTIVE;
+				rollbackMetadata.oldFirmwareStatus = NO_OLD_VER;
+				Flash_eraseMultiplePage(APP2_START_ADDR, 20);
+			}
+			else if(rollbackMetadata.oldFirmwareStatus == APP2_OLD)
+			{
+				rollbackMetadata.activeFirmwareStatus = APP2_ACTIVE;
+				rollbackMetadata.oldFirmwareStatus = NO_OLD_VER;
+				Flash_eraseMultiplePage(APP1_START_ADDR, 20);
+			}
+			else if(rollbackMetadata.oldFirmwareStatus == NO_OLD_VER)
+			{
+				rollbackMetadata.activeFirmwareStatus = FIRST_RUN;
+				rollbackMetadata.oldFirmwareStatus = NO_OLD_VER;
+				Flash_eraseMultiplePage(APP1_START_ADDR, 20);
+			}
+			// 1 case nữa trong trường hợp chỉ có 1 firmware, và firmware đó hỏng
+			Flash_eraseMetadata();
+			Flash_writeMetadata(&rollbackMetadata);
+			RCC_CSR |= (1 << 24);
+		}
+	}
 }
 
 void Initialization(void)
@@ -216,9 +162,10 @@ void Initialization(void)
 	Ringbuffer_init(ringbuffer);
 	// GPIOC P13 init for toggle signal
 	GPIO_init_output(GPIOC, 13);
+	// Init Bootpin
+	GPIO_InitBootPin();
 	// UART GPIO Init for RX (input, pushpull, pullup) and TX
 	UART1_gpio_init();
-	// SETUP DMA
 	// DMA-RX Init
 	UART1_DMA_Setup();
 	// DMA1 Channel5 init (this channel for uart1 rx)
@@ -229,87 +176,61 @@ void Initialization(void)
 	setup_timer1();
 }
 
-void UpdateFirmware(uint32_t address, uint16_t current_app, uint16_t previous_app)
+void updateFirmware(uint32_t address, uint32_t current_app, uint32_t previous_app)
 {
-	uint32_t current_flash_address = address;
 	uint8_t data;
 	uint8_t tmp_data;
 	uint8_t has_tmp_data = 0;
-
-	// Receive state
-	enum{
-		WAIT_START,
-		RECEIVING,
-		WAIT_STOP
-	};
-	// Set trạng thái đầu tiên luôn ở Wait_start
-	uint8_t state = WAIT_START;
-	// Buffer này dành cho 'start' signal
-	char startBuff[6] = {0};
-	uint8_t startCharIndex = 0;
+	uint8_t startIndex = 0;
 	while(1)
 	{
+		// watchdog refresh
 		IWDG_refresh();
 		// Nếu đã nhận được stop, reset ngay, không chờ data nữa
-		if(state == WAIT_STOP)
+		if(receiveState == WAIT_STOP)
 		{
-			Flash_EraseOnePage(METADATA_FLAGS_ADDR);
-			Flash_WriteHalfWord(METADATA_FLAGS_ADDR, current_app);
-			Flash_WriteHalfWord(METADATA_FLAGS_ADDR + 2, previous_app);			// Ghi tại vị trí flags+2 cờ old app hiện tại
-			// Phiên chạy thử
-			Flash_EraseOnePage(METADATA_PENDING_ADDR);
-			Flash_WriteHalfWord(METADATA_PENDING_ADDR, UPDATEPENDING);
-			GPIO_toggle_pin(GPIOC, 13);
+			Metadata_t metadata_local;
+			Flash_eraseMetadata();
+
+			metadata_local.activeFirmwareStatus 	= current_app;
+			metadata_local.oldFirmwareStatus		= previous_app;
+			metadata_local.trialBootFlag			= TRIAL_MODE_START;
+			metadata_local.trialBootCount			= 0;
+
+			Flash_writeMetadata(&metadata_local);
 			// Soft reset, 0x05FA là key, bit 2 là bit reset
 			RESET_AIRCR = (0x05FA << 16) | (1 << 2);
 		}
 		// Update ringbuffer từ DMA
 		DMA1_Channel5_update_ringbuffer();
-		// Check ringbuffer, buff có data thì thực hiện write
+		// ringbuffer có data thì write
 		if(Ringbuffer_get(ringbuffer, &data))
 		{
-			switch(state)
+			switch(receiveState)
 			{
 			case WAIT_START:
-				if(startCharIndex < sizeof(startBuff) - 1)
+				IWDG_refresh();
+				startBuff[startIndex++] = data;
+				if (strncmp(startBuff, "START", 5) == 0)
 				{
-					IWDG_refresh();
-					// Toán tử index++, gán data sau đó mới cộng
-					startBuff[startCharIndex++] = data;
-					// Kết thúc bằng \0 để báo hiệu kết thúc chuỗi và so sánh
-					startBuff[startCharIndex] = '\0';
-					if(strstr(startBuff, "START"))
-					{
-						// Xóa 20 page bắt đầu từ current_flash_address
-						for (int i = 0; i < 20; i++)
-						{
-							Flash_EraseOnePage(current_flash_address + i * 1024);
-						}
-						startCharIndex = 0;
-						has_tmp_data = 0;
-						state = RECEIVING;
-						UART_Log("[STM32] START OK!\n");
-						UART_Log("[STM32] Receiving\n");
-					}
-				}
-				else
-				{
-					startCharIndex = 0;
+					receiveState = RECEIVING;
+					UART_Log("[STM32] START OK!\n");
+					UART_Log("[STM32] Receiving\n");
+					Flash_eraseMultiplePage(address, 20);
 				}
 				break;
 			case RECEIVING:
-				// Refresh Watchdog
 				IWDG_refresh();
-				// Sử dụng kỹ thuật left pushing technique
 				pushCharRightToLeft(stopBuff, data);
 				if (strncmp(stopBuff, "STOPP", 5) == 0)
 				{
-					state = WAIT_STOP;
+					receiveState = WAIT_STOP;
 					UART_Log("[STM32] STOP OK!\n");
 					UART_Log("[STM32] Received Successfully\n");
 					break;
 				}
-				if(!has_tmp_data)	// biến has tmp data để hỗ trợ việc ghép 2 data và tmp_data
+				// biến has tmp data để hỗ trợ việc ghép 2 data và tmp_data
+				if(!has_tmp_data)
 				{
 					tmp_data = data;
 					has_tmp_data = 1;
@@ -318,11 +239,13 @@ void UpdateFirmware(uint32_t address, uint16_t current_app, uint16_t previous_ap
 				{
 					// Ghép temp_data và data thành 16bit
 					uint16_t halfword = ((uint16_t)data << 8) | tmp_data;
-					Flash_WriteHalfWord(current_flash_address, halfword);
-					current_flash_address += 2;
+					Flash_WriteHalfWord(address, halfword);
+					address += 2;
 					has_tmp_data = 0;
 					GPIO_toggle_pin(GPIOC, 13);
 				}
+				break;
+			default:
 				break;
 			}
 		}
@@ -331,11 +254,11 @@ void UpdateFirmware(uint32_t address, uint16_t current_app, uint16_t previous_ap
 
 void pushCharRightToLeft(char arr[], char c)
 {
-    for(int i = 0; i < size - 1; i++)
+    for(int i = 0; i < STOPBUFFSIZE - 1; i++)
     {
         arr[i] = arr[i + 1];
     }
-    arr[size - 1] = c;
+    arr[STOPBUFFSIZE - 1] = c;
 }
 
 void JumpToApp1(void)
@@ -368,9 +291,4 @@ void JumpToApp2(void)
 	app2FuncPointer app2_pointer = (app2FuncPointer)app2_rshandler;
 	app2_pointer();
 	while(1);
-}
-
-void HardFault_Handler(void)
-{
-	GPIO_toggle_pin(GPIOC, 13);
 }

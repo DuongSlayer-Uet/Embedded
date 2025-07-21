@@ -36,5 +36,6 @@ void setup_timer1(void);
 
 void delay_1s(void);
 
+void delay_ms(uint32_t ms);
 
 #endif /* TIMER_H_ */

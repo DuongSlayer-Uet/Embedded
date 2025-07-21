@@ -25,7 +25,17 @@ void setup_timer1(void)
 
 void delay_1s(void)
 {
-	for(int i = 0; i < 100; i++)
+	for(int i = 0; i < 1000; i++)
+	{
+		TIM1->CNT = 0;
+		while((TIM1->SR & (1 << 0)) == 0x00);
+		TIM1->SR &= ~(1 << 0);
+	}
+}
+
+void delay_ms(uint32_t ms)
+{
+	for(int i = 0; i < ms; i++)
 	{
 		TIM1->CNT = 0;
 		while((TIM1->SR & (1 << 0)) == 0x00);
