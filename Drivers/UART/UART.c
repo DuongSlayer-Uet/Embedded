@@ -62,7 +62,17 @@ void UART1_DMA_Setup(void)
 	// Baud 9600
 	UART1->BRR = (52 << 4) | 1;
 	// Enable UART, RX
-	UART1->CR1 |= UE | RE;
+	UART1->CR1 |= UE | RE | TE;
 	// Enable DMA-RX
 	UART1->CR3 |= UART_CR3_DMAR;
+}
+
+void UART_Log(char str[])
+{
+	int i = 0;
+	while(str[i] != '\0')
+	{
+		UART1_send_data(str[i]);
+		i++;
+	}
 }

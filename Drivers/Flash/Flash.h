@@ -32,26 +32,15 @@ typedef struct
 
 // SR Register
 #define SR_BSY		(1 << 0)
-/*
-*@brief: Hàm write vào 1 địa chỉ trên flash 16 bit data
-*@param: address - địa chỉ cần write, data - dữ liệu kiểu hafword (16bit)
-*@retval: void
-*/
+
 void Flash_WriteHalfWord(uint32_t address, uint16_t data);
-/*
-*@brief: Hàm xóa 1 page (1024 bytes) ở địa chỉ address
-*@param: address - địa chỉ cần write
-*/
+
 void Flash_EraseOnePage(uint32_t address);
-/*
-*@brief: Hàm đọc 16 bit dữ liệu ở vùng địa chỉ address trên flash
-*@retval: 16 bit data 
-*/
+
 uint16_t Flash_ReadHalfWord(uint32_t address);
-/*
-*@retval: 32 bit data
-*@brief: Hàm đọc 32 bit data ở vùng địa chỉ address trên flash
-*/
+
 uint32_t Flash_ReadWord(uint32_t address);
+
+void Flash_eraseMultiplePage(uint32_t address, uint16_t num);
 
 #endif /* FLASH_H_ */
