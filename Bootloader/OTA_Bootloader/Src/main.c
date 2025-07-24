@@ -9,6 +9,7 @@
 #include "gpio.h"
 #include "IWDG.h"
 #include "Timer.h"
+#include "Interrupt.h"
 
 // System register control - thanh ghi soft reset
 #define RESET_AIRCR				(*(volatile uint32_t*)0xE000ED0C)
@@ -18,6 +19,12 @@
 #define STOPBUFFSIZE			5
 // START buff size
 #define STARTBUFFSIZE			5
+// TX Log ISR buffer
+char logBuff[1024] = {0};
+// TX Log buff size
+volatile uint16_t logSize = 0;
+// TX Log index
+volatile uint16_t logIndex = 0;
 // start buffer
 char startBuff[STARTBUFFSIZE] = {0};
 // stop buffer
@@ -42,6 +49,7 @@ void pushCharRightToLeft(char arr[], char c);
 void JumpToApp1(void);
 void JumpToApp2(void);
 void rollBack(void);
+void UART_Int_Log(char* data, uint16_t size);
 
 int main(void)
 {
@@ -59,23 +67,23 @@ int main(void)
 	// nếu Pin A0 == 0, update
 	if(GPIO_ReadBootPin() == 0)
 	{
-		UART_Log("[STM32] Boot Mode\n");
+		UART_Int_Log("[STM32] Boot Mode\n", strlen("[STM32] Boot Mode\n"));
 		switch(Flash_ReadHalfWord((uint32_t)&metadata->activeFirmwareStatus))
 		{
 		case APP1_ACTIVE:
-			UART_Log("[STM32] APP1_ACTIVE\n");
-			UART_Log("[STM32] APP2_OLD\n");
-			UART_Log("[STM32] Gonna update APP2\n");
+			UART_Int_Log("[STM32] APP1_ACTIVE\n", strlen("[STM32] APP1_ACTIVE\n"));
+			UART_Int_Log("[STM32] APP2_OLD\n", strlen("[STM32] APP2_OLD\n"));
+			UART_Int_Log("[STM32] Gonna update APP2\n", strlen("[STM32] Gonna update APP2\n"));
 			updateFirmware(APP2_START_ADDR, APP2_ACTIVE, APP1_OLD);
 			break;
 		case APP2_ACTIVE:
-			UART_Log("[STM32] APP2_ACTIVE\n");
-			UART_Log("[STM32] APP1_OLD\n");
-			UART_Log("[STM32] Gonna update APP1\n");
+			UART_Int_Log("[STM32] APP2_ACTIVE\n", strlen("[STM32] APP2_ACTIVE\n"));
+			UART_Int_Log("[STM32] APP1_OLD\n", strlen("[STM32] APP1_OLD\n"));
+			UART_Int_Log("[STM32] Gonna update APP1\n", strlen("[STM32] Gonna update APP1\n"));
 			updateFirmware(APP1_START_ADDR, APP1_ACTIVE, APP2_OLD);
 			break;
 		case FIRST_RUN:
-			UART_Log("[STM32] First RUN!\n");
+			UART_Int_Log("[STM32] First RUN!\n", strlen("[STM32] First RUN!\n"));
 			updateFirmware(APP1_START_ADDR, APP1_ACTIVE, NO_OLD_VER);
 			break;
 		default:
@@ -87,10 +95,12 @@ int main(void)
 		switch(Flash_ReadHalfWord((uint32_t)&metadata->activeFirmwareStatus))
 		{
 		case APP1_ACTIVE:
+			// UART_Int_Log("[STM32] Jump to APP1!\n", strlen("[STM32] Jump to APP1!\n"));
 			UART_Log("[STM32] Jump to APP1!\n");
 			JumpToApp1();
 			break;
 		case APP2_ACTIVE:
+			// UART_Int_Log("[STM32] Jump to APP2!\n", strlen("[STM32] Jump to APP2!\n"));
 			UART_Log("[STM32] Jump to APP2!\n");
 			JumpToApp2();
 			break;
@@ -165,13 +175,15 @@ void Initialization(void)
 	// Init Bootpin
 	GPIO_InitBootPin();
 	// UART GPIO Init for RX (input, pushpull, pullup) and TX
-	UART1_gpio_init();
-	// DMA-RX Init
-	UART1_DMA_Setup();
+	UART1_init();
+	// Enable IRQ 37 (usart1 - TX ỉnterrupt) from NVIC
+	NVIC_Enable_IRQ(37);
 	// DMA1 Channel5 init (this channel for uart1 rx)
 	DMA1_Channel5_UART1_RX_setup();
+	// DMA1 channel4 init (this channel for uart1 tx)
+	DMA1_Channel4_UART1_TX_Interrupt_setup();
 	// Bật Watchdog
-	IWDG_setup();
+	// IWDG_setup();
 	// Timer
 	setup_timer1();
 }
@@ -214,9 +226,9 @@ void updateFirmware(uint32_t address, uint32_t current_app, uint32_t previous_ap
 				if (strncmp(startBuff, "START", 5) == 0)
 				{
 					receiveState = RECEIVING;
-					UART_Log("[STM32] START OK!\n");
-					UART_Log("[STM32] Receiving\n");
+					UART_Int_Log("[STM32] START OK!\n", strlen("[STM32] START OK!\n"));
 					Flash_eraseMultiplePage(address, 20);
+					UART_Int_Log("[STM32] Receiving\n", strlen("[STM32] Receiving\n"));
 				}
 				break;
 			case RECEIVING:
@@ -224,9 +236,9 @@ void updateFirmware(uint32_t address, uint32_t current_app, uint32_t previous_ap
 				pushCharRightToLeft(stopBuff, data);
 				if (strncmp(stopBuff, "STOPP", 5) == 0)
 				{
-					receiveState = WAIT_STOP;
 					UART_Log("[STM32] STOP OK!\n");
 					UART_Log("[STM32] Received Successfully\n");
+					receiveState = WAIT_STOP;
 					break;
 				}
 				// biến has tmp data để hỗ trợ việc ghép 2 data và tmp_data
@@ -291,4 +303,19 @@ void JumpToApp2(void)
 	app2FuncPointer app2_pointer = (app2FuncPointer)app2_rshandler;
 	app2_pointer();
 	while(1);
+}
+
+void UART_Int_Log(char* data, uint16_t size)
+{
+	// Lưu data vào buff tạm
+	for(uint8_t i = 0; i < size; i++)
+	{
+		logBuff[i] = data[i];
+	}
+	logSize = size;
+	logIndex = 1;
+	// Kích chạy lần đầu
+	UART1->DR = logBuff[0];
+	// Set bit TX interrupt enable
+	UART1->CR1 |= TXEIE;
 }

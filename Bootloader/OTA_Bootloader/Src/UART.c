@@ -7,9 +7,12 @@
 #include "UART.h"
 #include "gpio.h"
 #include "RCC.h"
+#include "DMA.h"
+#include <string.h>
 
+extern uint8_t dma_tx_buffer[DMA_TX_BUFF_SIZE];
 
-void UART1_gpio_init(void)
+void UART1_init(void)
 {
 	// Clock Init
 	RCC->APB2ENR |= (1 << 2);	// GPIOA
@@ -23,11 +26,7 @@ void UART1_gpio_init(void)
 	GPIOA->CRH &= ~(0b1111 << 8);
 	GPIOA->CRH |= (0b1000 << 8);
 	GPIOA->ODR |= (1 << 10);
-}
 
-// BRR = fcpu/(16*baud)
-void UART1_baud_init(void)
-{
 	// Baud 9600
 	UART1->BRR = (52 << 4) | 1;
 
@@ -37,11 +36,8 @@ void UART1_baud_init(void)
 
 void UART1_RX_Int_setup(void)
 {
-	// Baud 9600
-	UART1->BRR = (52 << 4) | 1;
-
-	// Enable TX RX Uart
-	UART1->CR1 |= UE | RE | RXNEIE;
+	// Enable RX Uart
+	UART1->CR1 |= RXNEIE;
 }
 
 void UART1_send_data(char data)
@@ -57,15 +53,6 @@ char UART1_reveive_data(void)
 	return (char)(UART1->DR);
 }
 
-void UART1_DMA_Setup(void)
-{
-	// Baud 9600
-	UART1->BRR = (52 << 4) | 1;
-	// Enable UART, RX
-	UART1->CR1 |= UE | RE | TE;
-	// Enable DMA-RX
-	UART1->CR3 |= UART_CR3_DMAR;
-}
 
 void UART_Log(char str[])
 {
@@ -75,4 +62,18 @@ void UART_Log(char str[])
 		UART1_send_data(str[i]);
 		i++;
 	}
+}
+
+void UART_DMA_Log(char str[])
+{
+	// Tắt dma
+	DMA1_Channel4_UART1_TX_Interrupt_Disable();
+	uint16_t len = strlen(str);
+	memcpy(dma_tx_buffer, str, len);
+	// gán lại chuỗi
+	DMA1_Channel4->CMAR = (uint32_t)dma_tx_buffer;
+	// gán lại len
+	DMA1_Channel4->CNDTR = len;
+	// Bật dma
+	DMA1_Channel4_UART1_TX_Interrupt_Enable();
 }
