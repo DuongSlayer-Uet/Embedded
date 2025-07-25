@@ -10,6 +10,7 @@
 #include "IWDG.h"
 #include "Timer.h"
 #include "Interrupt.h"
+#include "CRC.h"
 
 // System register control - thanh ghi soft reset
 #define RESET_AIRCR				(*(volatile uint32_t*)0xE000ED0C)
@@ -19,6 +20,8 @@
 #define STOPBUFFSIZE			5
 // START buff size
 #define STARTBUFFSIZE			5
+// CRC buff size
+#define CRCBUFFSIZE				5
 // TX Log ISR buffer
 char logBuff[1024] = {0};
 // TX Log buff size
@@ -29,6 +32,8 @@ volatile uint16_t logIndex = 0;
 char startBuff[STARTBUFFSIZE] = {0};
 // stop buffer
 char stopBuff[STOPBUFFSIZE] = {0};
+// CRC buffer
+char crcBuff[CRCBUFFSIZE] = {0};
 // Function pointer
 typedef void (*app1FuncPointer)(void);
 typedef void (*app2FuncPointer)(void);
@@ -37,6 +42,7 @@ typedef enum
 {
 	WAIT_START,
 	RECEIVING,
+	WAIT_CRC,
 	WAIT_STOP
 } receiveState_t;
 // gán trạng thái đầu tiên là chờ bắt đầu
@@ -50,6 +56,7 @@ void JumpToApp1(void);
 void JumpToApp2(void);
 void rollBack(void);
 void UART_Int_Log(char* data, uint16_t size);
+uint32_t crcCal(uint32_t address);
 
 int main(void)
 {
@@ -186,6 +193,8 @@ void Initialization(void)
 	// IWDG_setup();
 	// Timer
 	setup_timer1();
+	// CRC
+	CRC_Setup();
 }
 
 void updateFirmware(uint32_t address, uint32_t current_app, uint32_t previous_app)
@@ -194,6 +203,11 @@ void updateFirmware(uint32_t address, uint32_t current_app, uint32_t previous_ap
 	uint8_t tmp_data;
 	uint8_t has_tmp_data = 0;
 	uint8_t startIndex = 0;
+	uint8_t crc_bytes[4] = {0};
+	uint8_t crcIndex = 0;
+	uint32_t crc_received;
+	uint32_t crc_calculated;
+	uint32_t crc_address = address;
 	while(1)
 	{
 		// watchdog refresh
@@ -234,6 +248,13 @@ void updateFirmware(uint32_t address, uint32_t current_app, uint32_t previous_ap
 			case RECEIVING:
 				IWDG_refresh();
 				pushCharRightToLeft(stopBuff, data);
+				pushCharRightToLeft(crcBuff, data);
+				if(strncmp(crcBuff, "CRC32", 5) == 0)
+				{
+					UART_Int_Log("[STM32] crc32 receiving!\n", strlen("[STM32] crc32 receiving!\n"));
+					receiveState = WAIT_CRC;
+					break;
+				}
 				if (strncmp(stopBuff, "STOPP", 5) == 0)
 				{
 					UART_Log("[STM32] STOP OK!\n");
@@ -257,6 +278,33 @@ void updateFirmware(uint32_t address, uint32_t current_app, uint32_t previous_ap
 					GPIO_toggle_pin(GPIOC, 13);
 				}
 				break;
+
+			case WAIT_CRC:
+				IWDG_refresh();
+				crc_bytes[crcIndex++] = data;
+			    if (crcIndex == 4)
+			    {
+			        crc_received = ((uint32_t)crc_bytes[3] << 24) |
+			                       ((uint32_t)crc_bytes[2] << 16) |
+			                       ((uint32_t)crc_bytes[1] << 8) |
+			                       ((uint32_t)crc_bytes[0]);
+			        UART_Log("[STM32] CRC received OK! Checking...\n");
+			        crc_calculated = crcCal(crc_address);
+			        if(crc_received == crc_calculated)
+			        {
+			        	UART_Log("[STM32] CRC MATCH!\n");
+			        	receiveState = WAIT_STOP;
+			        	break;
+			        }
+			        else
+			        {
+			        	UART_Int_Log("[STM32] CRC FAIL!\n", strlen("[STM32] CRC FAIL!\n"));
+			        	receiveState = WAIT_START;
+			        	break;
+			        }
+			    }
+
+				//uint32_t result = crcCal(current_app);
 			default:
 				break;
 			}
@@ -318,4 +366,21 @@ void UART_Int_Log(char* data, uint16_t size)
 	UART1->DR = logBuff[0];
 	// Set bit TX interrupt enable
 	UART1->CR1 |= TXEIE;
+}
+
+
+uint32_t crcCal(uint32_t address)
+{
+	uint32_t data;
+	while(1)
+	{
+		data = Flash_ReadWord(address);
+		if(data == 0x33435243)
+		{
+			break;
+		}
+		CRC_WriteWord(data);
+		address = address + 4;
+	}
+	return CRC_GetResult();
 }

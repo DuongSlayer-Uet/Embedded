@@ -17,6 +17,7 @@ Github repo: https://github.com/DuongSlayer-Uet/Embedded
 
 Update time: 19/7/2025
 """
+import os
 import network
 import urequests
 import time
@@ -163,12 +164,51 @@ def uart_irq_rx_handler(uart_inst):
         else:
             rx_buffer += byte
 
+# Brief: Hàm tính crc32bit
+# Param: crc - Giá trị hiện tại
+# Param: data - Giá trị muốn tính thêm
+# Retval: Giá trị crc32 trả về
+def crc32(crc, data):
+    crc ^= data
+    for _ in range(32):
+        if crc & 0x80000000:
+            crc = (crc << 1) ^ 0x04C11DB7
+        else:
+            crc <<= 1
+        crc &= 0xFFFFFFFF  # Giữ crc luôn nằm trong 32-bit
+    return crc
+
+# Brief: Hàm này tính CRC cho file blinkgithub.bin trong thư mục chính
+# Retval: CRC32 trả về của file bin
+def crc_cal(filepath="/blinkgithub.bin"):
+    try:
+        with open(filepath, "rb") as f:
+            crc = 0xFFFFFFFF
+            while True:
+                chunk = f.read(4)
+                if not chunk:
+                    break
+                # Padding nếu < 4 byte
+                if len(chunk) < 4:
+                    chunk += b'\xFF' * (4 - len(chunk))
+                
+                # Little endian: LSB first
+                data_word = (chunk[3] << 24) | (chunk[2] << 16) | (chunk[1] << 8) | chunk[0]
+                crc = crc32(crc, data_word)
+
+        print("[ESP32] CRC32 của", filepath, "là: 0x{:08X}".format(crc))
+        return crc
+    except Exception as e:
+        print("Lỗi:", e)
+        return None
+    
 
 # Đăng kí ngắt RX
 uart.irq(handler=uart_irq_rx_handler, trigger=UART.IRQ_RX)
 
 # Hàm main
 def check_and_update_loop():
+    global rx_buffer
     base_version_url = "https://api.github.com/repos/DuongSlayer-Uet/Embedded/contents/Firmware/version.txt"
     firmware_api_url = "https://api.github.com/repos/DuongSlayer-Uet/Embedded/contents/Firmware/blinkled.bin"
     firmware_path = "blinkgithub.bin"
@@ -190,8 +230,8 @@ def check_and_update_loop():
                 pin_PD5.value(0)
                 pin_PD18.init(Pin.OUT)
                 pin_PD18.value(0)
-                print("[ESP32] Reset for 1 seconds")
-                time.sleep(1)
+                #print("[ESP32] Reset for 1 seconds")
+                time.sleep(0.1)
                 # nhấc rst pin lên trước, boot pin lên sau
                 pin_PD18.value(1)
                 time.sleep(0.1)
@@ -201,12 +241,21 @@ def check_and_update_loop():
                 uart.write(b"START")
                 print("[ESP32] Đã gửi START")
                 time.sleep(0.5)
-
+                
                 send_firmware_uart(firmware_path)
-
+                
+                uart.write(b"CRC32")
+                
+                crc = crc_cal()
+                
+                if crc is not None:
+                    crc_bytes = crc.to_bytes(4, 'little')
+                    uart.write(crc_bytes)
+                    print("[ESP32] CRC Sent!")
+                
                 # Stop gửi
-                uart.write(b"STOPP")
-                print("[ESP32] Đã gửi STOP")
+                #uart.write(b"STOPP")
+                #print("[ESP32] Đã gửi STOP")
                 last_version = current_version
         else:
             print("[ESP32] Không có cập nhật mới.")
