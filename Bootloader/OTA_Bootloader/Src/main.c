@@ -70,6 +70,8 @@ int main(void)
 	if(Flash_ReadHalfWord((uint32_t)&metadata->activeFirmwareStatus) == 0xFFFF)
 	{
 		Flash_WriteHalfWord((uint32_t)&metadata->activeFirmwareStatus, FIRST_RUN);
+		// Xóa cờ rst
+		RCC_CSR |= (1 << 24);
 	}
 	// nếu Pin A0 == 0, update
 	if(GPIO_ReadBootPin() == 0)
@@ -163,7 +165,6 @@ void rollBack(void)
 				rollbackMetadata.oldFirmwareStatus = NO_OLD_VER;
 				Flash_eraseMultiplePage(APP1_START_ADDR, 20);
 			}
-			// 1 case nữa trong trường hợp chỉ có 1 firmware, và firmware đó hỏng
 			Flash_eraseMetadata();
 			Flash_writeMetadata(&rollbackMetadata);
 			RCC_CSR |= (1 << 24);
@@ -190,7 +191,7 @@ void Initialization(void)
 	// DMA1 channel4 init (this channel for uart1 tx)
 	DMA1_Channel4_UART1_TX_Interrupt_setup();
 	// Bật Watchdog
-	// IWDG_setup();
+	IWDG_setup();
 	// Timer
 	setup_timer1();
 	// CRC
@@ -249,19 +250,6 @@ void updateFirmware(uint32_t address, uint32_t current_app, uint32_t previous_ap
 				IWDG_refresh();
 				pushCharRightToLeft(stopBuff, data);
 				pushCharRightToLeft(crcBuff, data);
-				if(strncmp(crcBuff, "CRC32", 5) == 0)
-				{
-					UART_Int_Log("[STM32] crc32 receiving!\n", strlen("[STM32] crc32 receiving!\n"));
-					receiveState = WAIT_CRC;
-					break;
-				}
-				if (strncmp(stopBuff, "STOPP", 5) == 0)
-				{
-					UART_Log("[STM32] STOP OK!\n");
-					UART_Log("[STM32] Received Successfully\n");
-					receiveState = WAIT_STOP;
-					break;
-				}
 				// biến has tmp data để hỗ trợ việc ghép 2 data và tmp_data
 				if(!has_tmp_data)
 				{
@@ -276,6 +264,12 @@ void updateFirmware(uint32_t address, uint32_t current_app, uint32_t previous_ap
 					address += 2;
 					has_tmp_data = 0;
 					GPIO_toggle_pin(GPIOC, 13);
+				}
+				if(strncmp(crcBuff, "CRC32", 5) == 0)
+				{
+					UART_Int_Log("[STM32] crc32 receiving!\n", strlen("[STM32] crc32 receiving!\n"));
+					receiveState = WAIT_CRC;
+					break;
 				}
 				break;
 
@@ -374,6 +368,7 @@ uint32_t crcCal(uint32_t address)
 	uint32_t data;
 	while(1)
 	{
+		IWDG_refresh();
 		data = Flash_ReadWord(address);
 		if(data == 0x33435243)
 		{
