@@ -15,12 +15,15 @@ void enable_clock_for_timer1(void)
 
 void setup_timer1(void)
 {
+	// 8mhz
+	RCC_APB2ENR |= (1 << 11);
 	// Pres = 8, fcpu = HSI = 8mhz, => ftimer = 8000000/8 = 1Mhz
 	TIM1->PSC = 7;
 	// Count max 0->999
 	TIM1->ARR = 999;
 	// Enable count
 	TIM1->CR1 |= (1 << 0);
+
 }
 
 void delay_1s(void)

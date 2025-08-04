@@ -9,6 +9,7 @@
 #include "UART.h"
 #include "gpio.h"
 #include "DMA.h"
+#include "Timer.h"
 #include <stdint.h>
 
 // TX Log ISR buffer
@@ -17,6 +18,8 @@ extern char logBuff[1024];
 extern volatile uint16_t logSize;
 // TX Log index
 extern volatile uint16_t logIndex;
+// Elapsed time
+extern uint32_t elapsedTime;
 
 void NVIC_Enable_IRQ(uint8_t EXTI_IRQ_NUM)
 {
@@ -214,3 +217,13 @@ void DMA1_Channel4_IRQHandler(void)
 	}
 }
 
+void TIM1_UP_IRQHandler(void)
+{
+	if(TIM1->SR & (1 << 0))
+	{
+		// Clear cờ
+		TIM1->SR &= ~(1 << 0);
+		// tăng lên 1 ms
+		elapsedTime++;
+	}
+}

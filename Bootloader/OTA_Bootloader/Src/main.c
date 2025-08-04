@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 #include "Metadata.h"
 #include "Flash.h"
 #include "DMA.h"
@@ -34,6 +35,10 @@ char startBuff[STARTBUFFSIZE] = {0};
 char stopBuff[STOPBUFFSIZE] = {0};
 // CRC buffer
 char crcBuff[CRCBUFFSIZE] = {0};
+// Elapsed time
+uint32_t elapsedTime = 0;
+
+
 // Function pointer
 typedef void (*app1FuncPointer)(void);
 typedef void (*app2FuncPointer)(void);
@@ -117,7 +122,7 @@ int main(void)
 			while(1)
 			{
 				IWDG_refresh();
-				delay_ms(200);
+				delay_ms(100);
 			}
 			break;
 		default:
@@ -194,6 +199,8 @@ void Initialization(void)
 	IWDG_setup();
 	// Timer
 	setup_timer1();
+	// Enable IRQ 25 (TIM1 update interrupt)
+	NVIC_Enable_IRQ(25);
 	// CRC
 	CRC_Setup();
 }
@@ -209,6 +216,7 @@ void updateFirmware(uint32_t address, uint32_t current_app, uint32_t previous_ap
 	uint32_t crc_received;
 	uint32_t crc_calculated;
 	uint32_t crc_address = address;
+	char msg_sprintf[64];
 	while(1)
 	{
 		// watchdog refresh
@@ -223,6 +231,7 @@ void updateFirmware(uint32_t address, uint32_t current_app, uint32_t previous_ap
 			metadata_local.oldFirmwareStatus		= previous_app;
 			metadata_local.trialBootFlag			= TRIAL_MODE_START;
 			metadata_local.trialBootCount			= 0;
+			metadata_local.elapsedTime 				= (uint16_t)elapsedTime;
 
 			Flash_writeMetadata(&metadata_local);
 			// Soft reset, 0x05FA là key, bit 2 là bit reset
@@ -244,6 +253,10 @@ void updateFirmware(uint32_t address, uint32_t current_app, uint32_t previous_ap
 					UART_Int_Log("[STM32] START OK!\n", strlen("[STM32] START OK!\n"));
 					Flash_eraseMultiplePage(address, 20);
 					UART_Int_Log("[STM32] Receiving\n", strlen("[STM32] Receiving\n"));
+					// Bật ngắt tràn timer1 (đếm elapsed time)
+					TIM1->DIER |= (1 << 0);
+					// Set bộ đếm về 0
+					TIM1->CNT = 0;
 				}
 				break;
 			case RECEIVING:
@@ -267,6 +280,10 @@ void updateFirmware(uint32_t address, uint32_t current_app, uint32_t previous_ap
 				}
 				if(strncmp(crcBuff, "CRC32", 5) == 0)
 				{
+		        	// Tắt ngắt tràn timer1 (đếm elapsed time)
+		        	TIM1->DIER &= ~(1 << 0);
+			        sprintf(msg_sprintf, "[STM32] Elapsed Time: %lu ms\n", elapsedTime);
+			        UART_Log(msg_sprintf);
 					UART_Int_Log("[STM32] crc32 receiving!\n", strlen("[STM32] crc32 receiving!\n"));
 					receiveState = WAIT_CRC;
 					break;

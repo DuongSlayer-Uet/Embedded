@@ -43,6 +43,7 @@ typedef struct
 	uint16_t trialBootCount;
 	uint16_t versionApp1;
 	uint16_t versionApp2;
+	uint16_t elapsedTime;
 } Metadata_t;
 
 #define metadata					((volatile Metadata_t*)METADATA_START_ADDR)

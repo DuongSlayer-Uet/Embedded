@@ -28,7 +28,7 @@ void UART1_init(void)
 	GPIOA->ODR |= (1 << 10);
 
 	// Baud 9600
-	UART1->BRR = (52 << 4) | 1;
+	UART1->BRR = 0x45;
 
 	// Enable TX RX Uart
 	UART1->CR1 |= UE | TE | RE;
