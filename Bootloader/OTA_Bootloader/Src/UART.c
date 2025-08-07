@@ -27,7 +27,7 @@ void UART1_init(void)
 	GPIOA->CRH |= (0b1000 << 8);
 	GPIOA->ODR |= (1 << 10);
 
-	// Baud 9600
+	// Baud 115200
 	UART1->BRR = 0x45;
 
 	// Enable TX RX Uart
