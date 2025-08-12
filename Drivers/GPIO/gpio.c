@@ -64,18 +64,3 @@ void GPIO_toggle_pin(GPIO_Typedef* gpio, uint8_t pin)
 		gpio->BSRR = (1 << pin);
 	}
 }
-
-void GPIO_InitBootPin(void)
-{
-	// Clock enable for PA port
-	RCC_APB2ENR |= (1 << 2);
-	// Input, pull up/pulldown
-	GPIOA->CRL &= ~(0xF << 0);
-	GPIOA->CRL |= (0b1000 << 0);
-	// pull up
-	GPIOA->ODR |= (1 << 0);
-}
-uint32_t GPIO_ReadBootPin(void)
-{
-	return (GPIOA->IDR & (1 << 0));
-}
