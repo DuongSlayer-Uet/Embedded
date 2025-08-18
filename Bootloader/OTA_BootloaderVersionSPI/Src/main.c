@@ -24,19 +24,6 @@ extern uint8_t SPIxDMA_RxBuffer[SPIxDMA_RXBUFFSIZE];
 // Ringbuffer
 extern RingBuffer_Typedef RingBuffer;
 
-// Receiving stage
-typedef enum
-{
-	START,
-	APPID,
-	VERSION,
-	SIZE,
-	CRC32,
-	ENTRYADDR,
-	DATA,
-	CRCCHECKING
-} ReceiveState_t;
-
 // APP state
 typedef struct
 {
@@ -63,6 +50,8 @@ void Initialization(void);
 void TIM1_UP_IRQHandler(void);
 uint8_t ascii2num(uint8_t c);
 uint32_t crcCal(uint32_t address, uint32_t size);
+void JumpToApp1(void);
+void JumpToApp2(void);
 
 int main()
 {
@@ -96,8 +85,8 @@ int main()
 
 void Initialization(void)
 {
-	// RCC HSI = 8mhz
-	RCC_Config_HSI_8MHz();
+	// RCC HSI = 48mhz
+	RCC_Config_HSE_PLL_48MHz();
 	// Ringbuffer Init
 	Ringbuffer_init(&RingBuffer);
 	// GPIOC P13 init for toggle signal
@@ -111,24 +100,22 @@ void Initialization(void)
 	TIM1_SetUp();
 	// TIM1 enable IRQNVIC
 	NVIC_Enable_IRQ(25);
+	// High speed for flash (two wait states)
+	Flash_ConfigHighSpeed();
 }
 
 void UpdateFirmware(void)
 {
 	APPInfor_t app;
 	memset(&app, 0, sizeof(app));
-	ReceiveState_t ReceiveState	= START;
 	uint8_t data;
 	uint8_t appInforCNT = 0;
 	uint8_t appInfor[20];
 	uint8_t byteCount 			= 0;
-	uint32_t temp 				= 0;
-	uint8_t	patch 				= 0;
-	uint8_t minor 				= 0;
-	uint8_t major 				= 0;
 	uint16_t halfword 			= 0;
 	uint32_t crcResult 			= 0;
 	uint32_t address		 	= 0;
+	elapsedTimeCNT = 0;
 	while(1)
 	{
 		DMAxRingBuffer_UpdateData();
@@ -137,12 +124,14 @@ void UpdateFirmware(void)
 		{
 			// Dừng đếm, get counter
 			TIM1_GetCNT();
+			/*
 			// convert sang số thường
 			// Do có vài số mình cần ở dạng hex, vài số cần ở dạng dec, nên cần convert vài số thui =))
 			for(int i = 5; i <= 7; i++)
 			{
 				appInfor[i] = ascii2num(appInfor[i]);
 			}
+			*/
 			// Gán thông số nhận được
 			app.ElapsedTime = elapsedTimeCNT;
 			app.Crc = (appInfor[15] << 24) | (appInfor[14] << 16) | (appInfor[13] << 8) | appInfor[12];
@@ -162,7 +151,7 @@ void UpdateFirmware(void)
 				// Nếu là app1
 				if(mainMetadata.activeFirmwareStatus == 1)
 				{
-					if(app.ID == '1')
+					if(app.ID == 1)
 					{
 						mainMetadata.activeFirmwareStatus 		= 1;
 						mainMetadata.CRCApp1 					= app.Crc;
@@ -173,7 +162,7 @@ void UpdateFirmware(void)
 						mainMetadata.trialBootFlag				= 1;
 						mainMetadata.trialBootCount 			= 0;
 					}
-					else if(app.ID == '2')
+					else if(app.ID == 2)
 					{
 						mainMetadata.activeFirmwareStatus 		= 2;
 						mainMetadata.oldFirmwareStatus			= 1;					// Set old version
@@ -188,7 +177,7 @@ void UpdateFirmware(void)
 				}
 				if(mainMetadata.activeFirmwareStatus == 2)
 				{
-					if(app.ID == '1')
+					if(app.ID == 1)
 					{
 						mainMetadata.activeFirmwareStatus 		= 1;
 						mainMetadata.oldFirmwareStatus			= 2;				// Set old version
@@ -200,7 +189,7 @@ void UpdateFirmware(void)
 						mainMetadata.trialBootFlag				= 1;
 						mainMetadata.trialBootCount 			= 0;
 					}
-					else if(app.ID == '2')
+					else if(app.ID == 2)
 					{
 						mainMetadata.activeFirmwareStatus 		= 2;
 						mainMetadata.CRCApp2 					= app.Crc;
@@ -214,7 +203,7 @@ void UpdateFirmware(void)
 				}
 				if(mainMetadata.activeFirmwareStatus == 0xFFFFFFFF)
 				{
-					if(app.ID == '1')
+					if(app.ID == 1)
 					{
 						mainMetadata.activeFirmwareStatus 		= 1;
 						mainMetadata.CRCApp1 					= app.Crc;
@@ -225,7 +214,7 @@ void UpdateFirmware(void)
 						mainMetadata.trialBootFlag				= 1;
 						mainMetadata.trialBootCount 			= 0;
 					}
-					else if(app.ID == '2')
+					else if(app.ID == 2)
 					{
 						mainMetadata.activeFirmwareStatus 		= 2;
 						mainMetadata.CRCApp2 					= app.Crc;
@@ -250,15 +239,16 @@ void UpdateFirmware(void)
 			if(appInforCNT < 20)
 			{
 				appInfor[appInforCNT] = data;
-				appInforCNT++;
 				if(appInforCNT == 19)
 				{
 					// Ghép theo little edian
 					address = (appInfor[19] << 24) | (appInfor[18] << 16) | (appInfor[17] << 8) | (appInfor[16]);		// App Address
 					app.EntryAddr = address;
 					// SPI gửi data cực nhanh nên hạn chế xử lý nhiều data ở đây
-					TIM1_StartCounting();		// Bắt đầu count data uploading
+					TIM1_StartCounting();						// Bắt đầu count data uploading
+					Flash_eraseMultiplePage(app.EntryAddr, 20);
 				}
+				appInforCNT++;
 			}
 			else
 			{

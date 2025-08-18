@@ -38,7 +38,7 @@ typedef struct
  */
 void GPIO_init_output(GPIO_Typedef* gpio, uint8_t pin);
 /*
- * @brief: GPIOA0 dùng làm bootpin
+ * @brief: Khởi tạo bootpin
  */
 void GPIO_InitBootPin(void);
 /*
@@ -67,5 +67,9 @@ void GPIO_reset(GPIO_Typedef* gpio, uint8_t pin);
  * @retval none
  */
 void GPIO_toggle_pin(GPIO_Typedef* gpio, uint8_t pin);
+/*
+ * @Brief: Tắt bootpin trước khi jump
+ */
+void GPIO_DisableBootPin(void);
 
 #endif /* GPIO_H_ */

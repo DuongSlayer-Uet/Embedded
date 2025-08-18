@@ -7,6 +7,13 @@
 
 #include "Flash.h"
 
+void Flash_ConfigHighSpeed(void)
+{
+	FLASH->ACR |= CR_PREFETCH;
+	FLASH->ACR &= ~CR_LATENCY;
+	FLASH->ACR |= CR_LATENCY;
+}
+
 void Flash_WriteHalfWord(uint32_t address, uint16_t data)
 {
 	// Chờ hết busy

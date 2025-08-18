@@ -29,9 +29,14 @@ typedef struct
 #define CR_PG		(1 << 0)
 #define CR_PER		(1 << 1)
 #define CR_STRT		(1 << 6)
+#define CR_LATENCY	(0b010 << 0)
+#define CR_PREFETCH	(1 << 4)
 
 // SR Register
 #define SR_BSY		(1 << 0)
+
+// Brief: Hàm này config cho flash 48-72mhz clock
+void Flash_ConfigHighSpeed(void);
 
 void Flash_WriteHalfWord(uint32_t address, uint16_t data);
 

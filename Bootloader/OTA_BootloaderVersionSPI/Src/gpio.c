@@ -29,17 +29,17 @@ void GPIO_init_output(GPIO_Typedef* gpio, uint8_t pin)
 	}
 
 
-	// output max speed 2mHz
+	// output max speed 50mHz
 	if(pin < 8)
 	{
 		gpio->CRL &= ~(0xF << (pin*4));		// Reset MODE and CNF bit to 0
-		gpio->CRL |= (0x2 << (pin*4));			// Set MODE and CNF bit to 0010
+		gpio->CRL |= (0b0011 << (pin*4));			// Set MODE and CNF bit to 0010
 	}
 	else if(pin >= 8)
 	{
 		pin -= 8;
 		gpio->CRH &= ~(0xF << (pin*4));
-		gpio->CRH |= (0x2 << (pin*4));
+		gpio->CRH |= (0b0011 << (pin*4));
 	}
 }
 

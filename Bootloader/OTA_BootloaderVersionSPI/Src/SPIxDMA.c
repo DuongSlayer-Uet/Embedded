@@ -15,7 +15,6 @@ uint8_t SPIxDMA_RxBuffer[SPIxDMA_RXBUFFSIZE];
 
 void SPI1xDMA_SlaveSetup(void)
 {
-	// DMA rcc = AHB = 8mhz
 	RCC->AHBENR |= (1 << 0);
 
 	// ====== DMA RX =======

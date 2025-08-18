@@ -56,7 +56,6 @@ void SPI1_MasterSetup(void)
 void SPI1_SlaveSetup(void)
 {
     // CLOCK CONFIG
-    RCC_Config_HSI_8MHz(); // APB2 = 8MHz
     // Enable SPI1 clock (APB2), AFIO, GPIOA
     RCC->APB2ENR |= (1 << 12) | (1 << 0) | (1 << 2);
 
@@ -64,9 +63,9 @@ void SPI1_SlaveSetup(void)
     // PA7 - MOSI (Master Out Slave In) - Input floating
     GPIOA->CRL &= ~(0xF << 28);
     GPIOA->CRL |= (0b0100 << 28);
-    // PA6 - MISO (Master In Slave Out) - Output AF push-pull max 10MHz
+    // PA6 - MISO (Master In Slave Out) - Output AF push-pull max 50MHz
     GPIOA->CRL &= ~(0xF << 24);
-    GPIOA->CRL |= (0b1001 << 24);
+    GPIOA->CRL |= (0b1011 << 24);
     // PA5 - SCK - Input floating
     GPIOA->CRL &= ~(0xF << 20);
     GPIOA->CRL |= (0b0100 << 20);
