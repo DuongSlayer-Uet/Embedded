@@ -1,0 +1,9 @@
+../Core/Src/Interrupt.c:12:6:NVIC_Enable_IRQ	16	static
+../Core/Src/Interrupt.c:24:6:EXTI_Init	24	static
+../Core/Src/Interrupt.c:82:6:EXTI0_IRQHandler	4	static
+../Core/Src/Interrupt.c:94:6:EXTI1_IRQHandler	4	static
+../Core/Src/Interrupt.c:106:6:EXTI2_IRQHandler	4	static
+../Core/Src/Interrupt.c:119:6:EXTI3_IRQHandler	4	static
+../Core/Src/Interrupt.c:131:6:EXTI4_IRQHandler	4	static
+../Core/Src/Interrupt.c:142:6:EXTI9_5_IRQHandler	16	static
+../Core/Src/Interrupt.c:155:6:UET_EXTI15_10_IRQHandler	16	static
