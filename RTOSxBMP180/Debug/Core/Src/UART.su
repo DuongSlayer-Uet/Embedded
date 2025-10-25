@@ -1,5 +1,0 @@
-../Core/Src/UART.c:12:6:UART1xRS485_init	4	static
-../Core/Src/UART.c:34:6:UART1xRS485_RX_Int_setup	4	static
-../Core/Src/UART.c:40:6:UART1xRS485_send_data	16	static
-../Core/Src/UART.c:47:6:UART1xRS485_reveive_data	4	static
-../Core/Src/UART.c:54:6:UART1xRS485_Log	24	static

@@ -1,5 +1,0 @@
-../Core/Src/UART.c:12:6:UART1xRS485_init	1
-../Core/Src/UART.c:34:6:UART1xRS485_RX_Int_setup	1
-../Core/Src/UART.c:40:6:UART1xRS485_send_data	3
-../Core/Src/UART.c:47:6:UART1xRS485_reveive_data	2
-../Core/Src/UART.c:54:6:UART1xRS485_Log	2

@@ -1,6 +1,0 @@
-../Core/Src/RCC.c:9:6:RCC_Config_HSE_PLL_48MHz	3
-../Core/Src/RCC.c:42:6:RCC_Config_HSE_PLL_72MHz	3
-../Core/Src/RCC.c:80:6:RCC_Config_HSI_8MHz	2
-../Core/Src/RCC.c:106:6:RCC_Config_HSI_PLL_64MHz	3
-../Core/Src/RCC.c:144:6:RCC_Config	5
-../Core/Src/RCC.c:163:6:RCC_Config_LSI_40K	2

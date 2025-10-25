@@ -1,5 +1,0 @@
-../Core/Src/BMP180.c:13:6:BMP180_I2C1_SlaveConfig	4	static
-../Core/Src/BMP180.c:38:6:BMP180_I2C1_MasterConfig	4	static
-../Core/Src/BMP180.c:68:9:BMP180_I2C1_Write8	16	static
-../Core/Src/BMP180.c:97:9:BMP180_I2C1_Read8	24	static
-../Core/Src/BMP180.c:136:10:BMP180_I2C1_Read16	24	static

@@ -1,8 +1,0 @@
-../Core/Src/main.c:76:6:USART1_IRQHandler	4	static
-../Core/Src/main.c:103:6:sendData	24	static
-../Core/Src/main.c:123:5:main	72	static
-../Core/Src/main.c:201:6:SystemClock_Config	72	static
-../Core/Src/main.c:238:13:MX_GPIO_Init	16	static
-../Core/Src/main.c:255:6:SendDataTask	56	static
-../Core/Src/main.c:278:6:ReadSensorTask	48	static
-../Core/Src/main.c:323:6:Error_Handler	4	static,ignoring_inline_asm
