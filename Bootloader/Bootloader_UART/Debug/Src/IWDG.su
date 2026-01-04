@@ -1,0 +1,2 @@
+../Src/IWDG.c:10:6:IWDG_setup	8	static
+../Src/IWDG.c:27:6:IWDG_refresh	4	static

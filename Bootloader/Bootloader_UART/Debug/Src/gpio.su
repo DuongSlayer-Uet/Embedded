@@ -1,0 +1,7 @@
+../Src/gpio.c:11:6:GPIO_init_output	16	static
+../Src/gpio.c:46:6:GPIO_set	16	static
+../Src/gpio.c:51:6:GPIO_reset	16	static
+../Src/gpio.c:56:6:GPIO_toggle_pin	16	static
+../Src/gpio.c:68:6:GPIO_InitBootPin	4	static
+../Src/gpio.c:78:10:GPIO_ReadBootPin	4	static
+../Src/gpio.c:82:6:GPIO_DisableBootPin	4	static
