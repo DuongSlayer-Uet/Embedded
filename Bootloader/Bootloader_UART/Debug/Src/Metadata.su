@@ -1,5 +1,0 @@
-../Src/Metadata.c:11:6:Flash_eraseMetadata	8	static
-../Src/Metadata.c:16:6:Flash_writeMetadata	24	static
-../Src/Metadata.c:35:6:Flash_readMetadata	24	static
-../Src/Metadata.c:53:10:Flash_encodeVer16bit	16	static
-../Src/Metadata.c:58:6:Flash_decodeVer16bit	24	static

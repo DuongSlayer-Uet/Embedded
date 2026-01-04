@@ -1,5 +1,0 @@
-../Src/UART.c:13:6:UART1_init	1
-../Src/UART.c:35:6:UART1_RX_Int_setup	1
-../Src/UART.c:41:6:UART1_send_data	3
-../Src/UART.c:48:6:UART1_reveive_data	2
-../Src/UART.c:55:6:UART_Log	2
