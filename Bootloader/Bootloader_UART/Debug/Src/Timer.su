@@ -1,0 +1,5 @@
+../Src/Timer.c:11:6:TIM1_SetUp	4	static
+../Src/Timer.c:20:6:TIM1_Delay1s	16	static
+../Src/Timer.c:32:6:TIM1_DelayMs	24	static
+../Src/Timer.c:44:6:TIM1_StartCounting	4	static
+../Src/Timer.c:52:10:TIM1_GetCNT	4	static

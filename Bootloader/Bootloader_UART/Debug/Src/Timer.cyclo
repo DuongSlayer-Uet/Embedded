@@ -1,0 +1,5 @@
+../Src/Timer.c:11:6:TIM1_SetUp	1
+../Src/Timer.c:20:6:TIM1_Delay1s	3
+../Src/Timer.c:32:6:TIM1_DelayMs	3
+../Src/Timer.c:44:6:TIM1_StartCounting	1
+../Src/Timer.c:52:10:TIM1_GetCNT	1

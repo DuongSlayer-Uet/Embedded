@@ -1,0 +1,8 @@
+../Src/main.c:58:5:main	1
+../Src/main.c:94:6:Initialization	1
+../Src/main.c:116:6:UpdateFirmware	6
+../Src/main.c:291:10:crcCal	5
+../Src/main.c:326:6:TIM1_UP_IRQHandler	2
+../Src/main.c:335:6:JumpToApp1	1
+../Src/main.c:351:6:JumpToApp2	1
+../Src/main.c:367:6:RollBack	8
