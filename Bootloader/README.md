@@ -1,25 +1,35 @@
 
 # OTA bootloader
-Techniques: SPI, DMA, Flash layout, Ringbuffer, Github API, Watchdog (IWDG), Lowlevel programming.
+Techniques: DMA, Flash layout, Ringbuffer, Watchdog (IWDG), Lowlevel programming, dual firmware, auto rollback,...
 # Mô tả
 *Thông tin thư mục:*
 
-- Application_Firmware: Đây là folder code app (blink led)
-- Factory_Firmware: Đây là folder code factory firmware (Cũng là blink led)
-- OTA_Bootloader: Đây là Main folder, chứa các file chi tiết về bootloader.
-- Esp32_Python: Đây là mã python cho esp32 để download firmware từ github về
+- ESP32: Thư mục này chứa code arduino IDE cho ESP32
+- Source: Thư mục này chứa source code bootloader của stm32
+- Header: Thư mục này chứa header code của STM32
 
-*Ý tưởng*: Xây dựng 1 bootloader tự động boot và nạp code.
+*Ý tưởng*: Xây dựng 1 bootloader tự động boot và nạp code cho STM32F1.
 
-*Chức năng*: Người dùng push firmware lên github, esp32 sẽ download firmware về và boot/update firmware đó cho stm32
+*Chức năng*: Người dùng push firmware lên webserver chạy local của ESP32 (Access point mode), esp32 sẽ download firmware về và boot/update firmware đó cho stm32
 
 *Chi tiết*: 
 
-Khi push firmware lên github, cần đi kèm với file version.txt. File version này chứa tên phiên bản, esp32 sẽ tải về và check theo chu kỳ 10s 1 lần, nếu có update, nó sẽ tải file firmware và nạp cho stm32. 
+Người dùng build file firmware với địa chỉ flash được chỉ định (một trong hai vùng 0x08002000 hoặc 0x08007000), sau khi build được file.bin thì thực hiện tạo một file version theo đúng tiêu chuẩn sau:
 
-Để bắt đầu nạp, Esp32 gửi chuỗi "START" qua uart, sau đó gửi firmware và kết thúc bằng việc gửi chuỗi "STOPP".
+APP_ID: 2
+VERSION: 2.0.31
+ENTRY_ADDR: 0x08007000
 
-STM32 sẽ set các cờ tương ứng với từng giai đoạn (chi tiết trong code), khi được set các cờ RUN_XX thì nhảy vào vùng nhớ tương ứng để chạy firmware.
+Trong đó APP_ID là ID của firmware, ID 1 tương ứng với địa chỉ 0x08002000 và ID 2 tương ứng với địa chỉ 0x08007000.
+VERSION là tên phiên bản của firmware vừa build, nó có dạng xxx.xxx.xxx. ENTRY_ADDR là địa chỉ CPU sẽ nhảy tới thực thi sau khi nạp xong firmware vào flash, nó có thể là một trong hai địa chỉ vừa nêu ở trên.
+
+Sau khi đã có 2 file: một file main.bin và một file version.txt theo đúng format.
+Người dùng thực hiện cấp nguồn cho board bằng cách kết nối với adapter 12V trên cổng header. Sau đó kết nối vào wifi nội bộ của ESP có tên là ESP32. Sau đó truy cập vào địa chỉ 192.168.4.1 để up các file vừa tạo lên đó, các file này sẽ được ESP32 pull về và nạp cho STM32 trên board (Hoàn toàn tự động, nạp từ xa, không cần cắm dây nạp gì cả, tất cả chỉ cần cấp nguồn 12V cho board).
+Tốc độ nạp siêu nhanh.
+
+## Kết quả demo
+
+Đã nạp thành công.
 
 ## Vấn đề gặp phải: 
 
@@ -51,21 +61,10 @@ Như vậy, Firmware sẽ không phải sửa gì cả, hoàn toàn tự động
 
 Có 1 bug phát sinh đó là soft reset của stm sẽ kéo pin nrst về 0. Trong khi nrst pin kết nối với GPIO của esp và nó đang kéo high. Điều này gây mâu thuẫn khiến cho stm không reset được. Bug này đã được fix bằng cách sau khi stm nhảy vào receive firmware, esp cho gpio về dạng input (floating).
 
-### **Fix bug + Big update lần IV (18/8/2025)**
-Sau khá nhiều thời gian suy nghĩ và thiết kế, Lần này chúng ta sẽ sử dụng 1 giao thức mới, nhanh hơn và cũng khá phổ biến đó là SPI. Nạp theo kiểu UART thì nó hơi cổ điển nên nạp bằng SPI sẽ mới mẻ hơn, có nhiều lợi thế, cũng có bất lợi.
+### **Fix bug + Big update lần IV (8/2/2026)**
+Hoàn thiện project, thiết kế board PCB hoàn chỉnh, test board và nạp thành công. 
+Nạp một file blink.bin 2kb với tốc độ 0.099s (đã đo bằng timer1)
 
-Do sử dụng SPI, mình muốn tối ưu hóa tốc độ truyền data, do vậy các bug chủ yếu liên quan đến tốc độ.
-
-Thứ nhất, ở dòng VĐK STMf103, thời gian write/erase khá lâu. Erase 20 page hết khoảng 20ms (đã đo bằng timer). Trong quá trình phát triển, mình để buffer dma là 1024 bytes. Trước khi bắt đầu write firmware, phải xóa cái cũ đi, xóa 20 pages. Nếu trong khoảng thời gian này mà master send data, tốc độ cao, sẽ bị tràn DMA buffer và miss data.
-
-Thứ hai, tốc độ write flash cũng có giới hạn (khoảng < 1ms mỗi halfword), nên nếu gửi quá nhanh, tốc độ ghi không tương xứng với tốc độ đọc, sẽ tràn dma buffer và miss data. Mặc dù SPI có thể đẩy tốc độ truyền lên tới **30Mhz** nếu bật max clock của stm32f103.
-
-Thứ ba, để CPU chỉ tập trung vào việc write flash, tránh xử lý data trong lúc đọc ghi.
-
-Thứ tư, mặc dù không phải vấn đề, nhưng trong SPI, với mỗi byte gửi tới, phải có 1 byte respond lại. Do đó, nếu muốn dùng DMA RX, cần phải có DMA TX để spam 1 ký tự bất kì cho master.
-## Kết luận 
-
-Đã push firmware lên github, sau đó ESP32 boot/update firmware cho stm32 thành công, hoàn toàn tự động.
 # Tài liệu tham khảo
 Reference manual (RM0008)
 
