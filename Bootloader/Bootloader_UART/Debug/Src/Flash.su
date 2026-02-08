@@ -1,8 +1,0 @@
-../Src/Flash.c:10:6:Flash_ConfigHighSpeed	4	static
-../Src/Flash.c:17:6:Flash_WriteHalfWord	16	static
-../Src/Flash.c:44:6:Flash_EraseOnePage	16	static
-../Src/Flash.c:76:10:Flash_ReadHalfWord	16	static
-../Src/Flash.c:81:10:Flash_ReadWord	16	static
-../Src/Flash.c:86:6:Flash_eraseMultiplePage	24	static
-../Src/Flash.c:94:9:Flash_ReadByte	16	static
-../Src/Flash.c:99:6:Flash_WriteWord	24	static

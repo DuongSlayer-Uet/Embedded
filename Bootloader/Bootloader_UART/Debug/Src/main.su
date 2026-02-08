@@ -1,8 +1,0 @@
-../Src/main.c:58:5:main	8	static
-../Src/main.c:94:6:Initialization	8	static
-../Src/main.c:116:6:UpdateFirmware	80	static
-../Src/main.c:291:10:crcCal	48	static
-../Src/main.c:326:6:TIM1_UP_IRQHandler	4	static
-../Src/main.c:335:6:JumpToApp1	24	static,ignoring_inline_asm
-../Src/main.c:351:6:JumpToApp2	24	static,ignoring_inline_asm
-../Src/main.c:367:6:RollBack	8	static

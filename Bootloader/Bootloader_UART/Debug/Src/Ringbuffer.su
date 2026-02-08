@@ -1,3 +1,0 @@
-../Src/Ringbuffer.c:12:6:Ringbuffer_put	24	static
-../Src/Ringbuffer.c:22:5:Ringbuffer_get	16	static
-../Src/Ringbuffer.c:30:6:Ringbuffer_init	16	static

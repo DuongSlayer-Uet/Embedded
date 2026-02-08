@@ -60,26 +60,28 @@ int main()
 	// Init Bootpin
 	GPIO_InitBootPin();
 	Initialization();
-	UpdateFirmware();
-	while(1);
-	// Low speed (40k) IWDG
-	// IWDG_setup();
-	// RollBack();
+	IWDG_setup();
+	RollBack();
 	if(GPIO_ReadBootPin() == 0)
 	{
 		// Update app
+		UpdateFirmware();
 	}
 	else
 	{
-		GPIO_DisableBootPin();
+		//GPIO_DisableBootPin();
 		Flash_readMetadata(&mainMetadata);
 		if(mainMetadata.activeFirmwareStatus == 1)
 		{
-			//JumpToApp1();
+			GPIO_set(GPIOA, 8);
+			GPIO_reset(GPIOB, 15);
+			JumpToApp1();
 		}
 		else if(mainMetadata.activeFirmwareStatus == 2)
 		{
-			//JumpToApp2();
+			GPIO_set(GPIOB, 15);
+			GPIO_reset(GPIOA, 8);
+			JumpToApp2();
 		}
 		else
 		{
@@ -99,6 +101,9 @@ void Initialization(void)
 	Ringbuffer_init(&RingBuffer);
 	// GPIOC P13 init for toggle signal
 	GPIO_init_output(GPIOC, 13);
+	// GPIO APP1,2 for APP state
+	GPIO_init_output(GPIOA, 8);
+	GPIO_init_output(GPIOB, 15);
 	// CRC
 	CRC_Setup();
 	// UART setup
@@ -117,6 +122,7 @@ void UpdateFirmware(void)
 {
 	APPInfor_t app;
 	memset(&app, 0, sizeof(app));
+	app.Siz = 1;
 	uint8_t data;
 	uint8_t appInforCNT = 0;
 	uint8_t appInfor[20];
@@ -129,10 +135,12 @@ void UpdateFirmware(void)
 	while(1)
 	{
 		DMAxRingBuffer_UpdateData();
-		/*
-		// Đọc pin chip select
-		if((GPIOA->IDR & (1 << 4)) != 0)
+
+		// Đọc bootpin
+		if(byteNum == app.Siz)
 		{
+			// Send ACK cuối cùng
+			UART1_send_data(0xAA);
 			// Nếu còn dư 1 byte lẻ
 			if(byteCount == 1)
 			{
@@ -147,9 +155,8 @@ void UpdateFirmware(void)
 			// Gán thông số nhận được
 			app.ElapsedTime = elapsedTimeCNT;
 			app.Crc = (appInfor[15] << 24) | (appInfor[14] << 16) | (appInfor[13] << 8) | appInfor[12];
-			app.Siz = (appInfor[11] << 24) | (appInfor[10] << 16) | (appInfor[9] << 8) 	| appInfor[8];
-			app.Ver = Flash_encodeVer16bit(appInfor[5], appInfor[6], appInfor[7]);
-			app.ID 	= appInfor[4];
+			app.Ver = Flash_encodeVer16bit(appInfor[4], appInfor[5], appInfor[6]);
+			app.ID 	= appInfor[7];
 			crcResult = crcCal(app.EntryAddr, app.Siz);
 			// Check CRC match
 			if(crcResult == app.Crc)
@@ -244,7 +251,7 @@ void UpdateFirmware(void)
 				RESET_AIRCR = (0x05FA << 16) | (1 << 2);
 			}
 		}
-		*/
+
 		// Nếu có data thì handle
 		if(Ringbuffer_get(&RingBuffer, &data))
 		{
@@ -257,8 +264,8 @@ void UpdateFirmware(void)
 				{
 					// Ghép theo little edian
 					address = (appInfor[19] << 24) | (appInfor[18] << 16) | (appInfor[17] << 8) | (appInfor[16]);		// App Address
+					app.Siz = (appInfor[11] << 24) | (appInfor[10] << 16) | (appInfor[9] << 8) 	| appInfor[8];
 					app.EntryAddr = address;
-					UART1_send_data(0xAA);
 					// SPI gửi data cực nhanh nên hạn chế xử lý nhiều data ở đây
 					TIM1_StartCounting();						// Bắt đầu count data uploading
 					Flash_eraseMultiplePage(app.EntryAddr, 20);

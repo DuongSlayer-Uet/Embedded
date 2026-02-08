@@ -11,8 +11,8 @@
 void TIM1_SetUp(void)
 {
 	RCC_APB2ENR |= (1 << 11);
-	// Pres = 47, fcpu = HSI = 48mhz, => ftimer = 48m/8 = 1Mhz
-	TIM1->PSC = 47;
+	// Pres = 7, fcpu = HSI = 8mhz, => ftimer = 8m/8 = 1Mhz
+	TIM1->PSC = 7;
 	// Count max 0->999
 	TIM1->ARR = 999;
 }
