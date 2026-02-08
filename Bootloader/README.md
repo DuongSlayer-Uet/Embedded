@@ -17,14 +17,16 @@ Techniques: DMA, Flash layout, Ringbuffer, Watchdog (IWDG), Lowlevel programming
 Người dùng build file firmware với địa chỉ flash được chỉ định (một trong hai vùng 0x08002000 hoặc 0x08007000), sau khi build được file.bin thì thực hiện tạo một file version theo đúng tiêu chuẩn sau:
 
 APP_ID: 2
+
 VERSION: 2.0.31
+
 ENTRY_ADDR: 0x08007000
 
 Trong đó APP_ID là ID của firmware, ID 1 tương ứng với địa chỉ 0x08002000 và ID 2 tương ứng với địa chỉ 0x08007000.
 VERSION là tên phiên bản của firmware vừa build, nó có dạng xxx.xxx.xxx. ENTRY_ADDR là địa chỉ CPU sẽ nhảy tới thực thi sau khi nạp xong firmware vào flash, nó có thể là một trong hai địa chỉ vừa nêu ở trên.
 
 Sau khi đã có 2 file: một file main.bin và một file version.txt theo đúng format.
-Người dùng thực hiện cấp nguồn cho board bằng cách kết nối với adapter 12V trên cổng header. Sau đó kết nối vào wifi nội bộ của ESP có tên là ESP32. Sau đó truy cập vào địa chỉ 192.168.4.1 để up các file vừa tạo lên đó, các file này sẽ được ESP32 pull về và nạp cho STM32 trên board (Hoàn toàn tự động, nạp từ xa, không cần cắm dây nạp gì cả, tất cả chỉ cần cấp nguồn 12V cho board).
+Người dùng thực hiện cấp nguồn cho board bằng cách kết nối với adapter 12V trên cổng header. Sau đó kết nối vào wifi nội bộ của ESP có tên là ESP32, password là 12345678. Sau đó truy cập vào địa chỉ 192.168.4.1 để up các file vừa tạo lên đó, các file này sẽ được ESP32 pull về và nạp cho STM32 trên board (Hoàn toàn tự động, nạp từ xa, không cần cắm dây nạp gì cả, tất cả chỉ cần cấp nguồn 12V cho board).
 Tốc độ nạp siêu nhanh.
 
 ## Kết quả demo
